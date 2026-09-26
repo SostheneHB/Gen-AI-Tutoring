@@ -1,0 +1,15 @@
+# Data files (ASSISTments data cannot be redistributed)
+*.csv
+*.csv.zip
+*.parquet
+*.pkl
+*.npz
+
+# Backups and local copies
+*_backup*.ipynb
+*_before_*.ipynb
+
+# Python / Jupyter caches
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
