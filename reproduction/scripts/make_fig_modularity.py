@@ -1,4 +1,4 @@
-"""Figure of the modularity side result (Paper 1, appendix): a two-community
+"""Figure of the modularity side result (appendix): a two-community
 graph and the spectrum of the random-walk matrix P against the coefficient
 operator of the full-indicator dictionary.
 

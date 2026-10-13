@@ -270,7 +270,7 @@ def across_splits(runs):
 
 def part_a(dataset, n_draws, seed=20260914):
     os.makedirs(OUT, exist_ok=True)
-    root = os.path.expanduser("~/Documents/Directive_research_copy_code")
+    root = os.environ.get("DATA_ROOT", ".")
     if dataset == "assistments":
         df = ap.keep_full_trajectories(ap.load_features("assistments_features_time.csv"))
         runs = [part_a_split(df, f"school_disjoint_{j}", seed + 200 + j, "school", "train", n_draws) for j in range(5)]
@@ -402,7 +402,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--part", choices=["A", "B"], required=True)
     p.add_argument("--dataset", default="assistments")
-    p.add_argument("--sim", default=os.path.expanduser("~/Documents/Directive_research_copy_code/Final_Folder_on_DR"))
+    p.add_argument("--sim", default=os.environ.get("SIM_DIR", "."))
     p.add_argument("--draws", type=int, default=N_DRAWS)
     a = p.parse_args()
     part_a(a.dataset, a.draws) if a.part == "A" else part_b(a.sim, a.draws)

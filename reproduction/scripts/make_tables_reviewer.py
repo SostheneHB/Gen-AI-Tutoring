@@ -11,7 +11,7 @@ r3 = lambda e: f"{e['mean']:.2f}"
 
 b = json.load(open("out_reviewer/budget.json"))
 rows = []
-names = {"fair": "Pareto-fair MPC (\\(c=2\\))", "topup_u1": "Targeted top-up, equal \\(\\mathcal U_1\\)",
+names = {"fair": "Floor-constrained MPC (\\(c=2\\))", "topup_u1": "Targeted top-up, equal \\(\\mathcal U_1\\)",
          "topup_u2": "Targeted top-up, equal \\(\\mathcal U_2\\)", "more_u1": "Uniform increase, equal \\(\\mathcal U_1\\)"}
 for g in ("0.5", "1.0", "2.0"):
     for i, (arm, lab) in enumerate(names.items()):
@@ -27,7 +27,7 @@ labels = {"weaker_response_group1": "Group 1 responds half as much",
           "slower_learning_more_noise": "Slower learning, twice the noise",
           "diminishing_returns": "Diminishing returns to help"}
 arms = [("proj_vs_raw", "Projected MPC vs.\\ original"), ("con_vs_raw", "Gap-constrained vs.\\ original"),
-        ("fair_vs_ga_ref", "Pareto-fair vs.\\ group-aware reference"), ("topup_u1_vs_ga_ref", "Top-up (equal \\(\\mathcal U_1\\)) vs.\\ reference")]
+        ("fair_vs_ga_ref", "Floor-constrained vs.\\ group-aware reference"), ("topup_u1_vs_ga_ref", "Top-up (equal \\(\\mathcal U_1\\)) vs.\\ reference")]
 rows = []
 for sc, lab in labels.items():
     for i, (k, alab) in enumerate(arms):

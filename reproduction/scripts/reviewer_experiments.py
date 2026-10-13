@@ -1,7 +1,7 @@
 """
 Experiments answering the external review (October 2026).
 
-    python reviewer_experiments.py budget        # E1 equal-budget baselines for the Pareto-fair MPC
+    python reviewer_experiments.py budget        # E1 equal-budget baselines for the floor-constrained MPC
     python reviewer_experiments.py solver        # E2 certification of the gap-constrained solver (Eq. 39)
     python reviewer_experiments.py structural    # E3 level-1 checks for Eedi, OULAD and the group-aware model
     python reviewer_experiments.py replicates    # E4 the 28 settings with 50 replicates and Holm correction
@@ -20,8 +20,8 @@ from scipy import stats
 import pareto_fair as pf
 import synthetic_regimes as sr
 
-SIM = os.path.expanduser("~/Documents/Directive_research_copy_code/Final_Folder_on_DR")
-DATA = os.path.expanduser("~/Documents/Directive_research_copy_code/Datasets")
+SIM = os.environ.get("SIM_DIR", ".")
+DATA = os.environ.get("DATA_DIR", "data")
 OUT = "out_reviewer"
 SEEDS10 = list(range(10))
 T = 25
@@ -284,7 +284,7 @@ def structural(fa):
     for att in ("imd", "gender", "disability"):
         df = base.copy(); df["S"] = df[f"S_{att}"]; df["G"] = df["S"].astype(int)
         out["oulad"] += [dict(attribute=att, **rows(df, 20260914 + 300 + j, "student", "given")) for j in range(5)]
-    # group-aware model: least-squares optimality, and the constraints of the Pareto-fair controller
+    # group-aware model: least-squares optimality, and the constraints of the floor-constrained controller
     for gamma in (0.5, 1.0, 2.0):
         fa.step = sr.make_step(gamma)
         for seed in SEEDS10:
@@ -352,6 +352,40 @@ def replicates(fa, n_seeds=50):
     fa.step = sr.make_step(1.0)
     print("[replicates] summary", summary, flush=True)
     return dict(n_seeds=n_seeds, summary=summary, rows=rows)
+
+
+def replicates_full(fa, n_seeds=50, cfgs=None):
+    """The regime-study table with 50 replicates for every arm: raw, projected, gap-penalty
+    (beta_gap = beta_ind, as in the regime study) and gap-constrained (certified solver).
+    Paired changes of |gap|, mean knowledge and each group's knowledge, Holm over the 28 settings."""
+    rows = []
+    for cfg in (cfgs or configs28()):
+        fa.step = sr.make_step(cfg["gamma"])
+        per = []
+        for seed in range(n_seeds):
+            model = fa.fit_model(seed, cfg["rank"], cfg["depth"])
+            init, noise, groups = fa.make_cohort(seed, horizon=cfg["horizon"])
+            mk = lambda proj: fa.MPCPolicy(*model.dynamics(proj), model.decoder, model.decoder_offset, beta=cfg["beta"])
+            per.append(dict(raw=rollout(fa, model, mk(False), init, noise, groups),
+                            proj=rollout(fa, model, mk(True), init, noise, groups),
+                            pen=rollout(fa, model, sr.CohortMPC(fa, model, 0.0, "penalty", beta_gap=cfg["beta"]), init, noise, groups),
+                            con=rollout(fa, model, CertifiedCohortMPC(fa, model), init, noise, groups)))
+        row = dict(config=cfg, raw_gap=summ([p["raw"]["gap"] for p in per]))
+        for arm in ("proj", "pen", "con"):
+            row[arm] = dict(abs_gap=summ([abs(p[arm]["gap"]) - abs(p["raw"]["gap"]) for p in per]),
+                            k=summ([p[arm]["k"] - p["raw"]["k"] for p in per]),
+                            k0=summ([p[arm]["k0"] - p["raw"]["k0"] for p in per]),
+                            k1=summ([p[arm]["k1"] - p["raw"]["k1"] for p in per]))
+        rows.append(row)
+        print(f"[replicates_full] {cfg}: " + " | ".join(
+            f"{a} d|gap| {row[a]['abs_gap']['mean']:+.4f} dk {row[a]['k']['mean']:+.4f}" for a in ("proj", "pen", "con")), flush=True)
+    for arm in ("proj", "pen", "con"):
+        for q in ("abs_gap", "k", "k0", "k1"):
+            for r, a in zip(rows, holm([r[arm][q]["p"] for r in rows])):
+                r[arm][q]["p_holm"] = float(a)
+    fa.step = sr.make_step(1.0)
+    return dict(n_seeds=n_seeds, rows=rows)
+
 
 
 # ---------------------------------------------------------------------------
@@ -484,6 +518,6 @@ if __name__ == "__main__":
     fa = sr.load_sim(SIM)
     t0 = time.time()
     res = {"budget": lambda: budget(fa), "solver": lambda: solver(fa), "structural": lambda: structural(fa),
-           "replicates": lambda: replicates(fa), "oulad": lambda: oulad(), "scenarios": lambda: scenarios(fa)}[part]()
+           "replicates": lambda: replicates(fa), "replicates_full": lambda: replicates_full(fa), "oulad": lambda: oulad(), "scenarios": lambda: scenarios(fa)}[part]()
     json.dump(res, open(os.path.join(OUT, f"{part}.json"), "w"), indent=1, default=float)
     print(f"[{part}] done in {time.time() - t0:.0f}s", flush=True)

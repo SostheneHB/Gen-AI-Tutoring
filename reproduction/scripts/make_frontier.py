@@ -25,7 +25,7 @@ def main():
     fig, axs = plt.subplots(1, len(R), figsize=(3.4 * len(R), 3.3), sharey=False)
     for ax, r, lab in zip(axs, R, "abc"):
         for kind, col, name in (("plain", "#2a78d6", "more control (smaller $\\rho$)"),
-                                ("fair", "#1baf7a", "Pareto-fair MPC (budget cap $c$)")):
+                                ("fair", "#1baf7a", "Floor-constrained MPC (budget cap $c$)")):
             arms = [(k, v) for k, v in r["arms"].items() if k.startswith(kind)]
             arms.sort(key=lambda kv: kv[1]["u_ratio"]["mean"])
             x = [v["u_ratio"]["mean"] for _, v in arms]
@@ -34,7 +34,8 @@ def main():
         ax.set_xlabel("mean $|u|$ relative to the reference MPC")
         ax.set_title(f"({lab}) $\\gamma={r['gamma']:g}$", loc="left", fontsize=9)
     axs[0].set_ylabel("reduction of the final gap $|\\delta_T|$")
-    axs[0].legend(fontsize=7.5, loc="upper left")
+    h, l = axs[0].get_legend_handles_labels()
+    fig.legend(h, l, fontsize=8, loc="upper center", ncol=2, bbox_to_anchor=(0.5, 0.0))
     fig.tight_layout()
     fig.savefig(f"{a.dest}/fig_frontier.png")
 
@@ -46,7 +47,7 @@ def main():
             out.append(r"\midrule")
         for name, e in sorted(r["arms"].items(), key=lambda kv: (kv[0].split("_")[0] != "plain", kv[1]["u_ratio"]["mean"])):
             kind, x = name.split("_")
-            lab = f"more control, \\(\\rho={x}\\)" if kind == "plain" else f"Pareto-fair, \\(c={x}\\)"
+            lab = f"more control, \\(\\rho={x}\\)" if kind == "plain" else f"floor-constrained, \\(c={x}\\)"
             if kind == "plain" and x == "1":
                 continue
             out.append(f"{r['gamma']:g} & {lab} & {e['u_ratio']['mean']:.2f} & {f(e['abs_gap'])} & {f(e['k0'])} & "

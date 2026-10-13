@@ -23,7 +23,7 @@ import numpy as np
 import assistments_pipeline as ap
 import rank_matched_controls as rm
 
-ROOT = os.path.expanduser("~/Documents/Directive_research_copy_code")
+ROOT = os.environ.get("DATA_ROOT", ".")
 TAUS = [0.0, 0.25, 0.5, 0.75, 1.0]
 
 
