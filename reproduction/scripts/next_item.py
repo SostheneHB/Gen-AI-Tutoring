@@ -167,14 +167,22 @@ def dkt_arms(Ktr, Ytr, Gtr, Kte, Yte, Gte, seed, epochs=int(os.environ.get("DKT_
     qtr, qte = qm.predict_proba(Htr_np)[:, 1], qm.predict_proba(Hte_np)[:, 1]
     p1 = gtr_.mean()
     cc = np.cov(ptr, qtr)[0, 1] / qtr.var()
-    f0 = np.clip(p - cc * (qte - p1), 1e-6, 1 - 1e-6)
+    f0_raw = p - cc * (qte - p1)                                   # the predictor of Proposition 5 (may leave [0, 1])
+    f0 = np.clip(f0_raw, 1e-6, 1 - 1e-6)                           # clipped, for AUC and log-loss
     out["dkt_prop5_erased"] = scores(f0, y, g)
+    clip_share = float(((f0_raw < 0) | (f0_raw > 1)).mean())
+    brier_raw = float(((f0_raw - y) ** 2).mean())
+    gap_raw = float(f0_raw[g == 1].mean() - f0_raw[g == 0].mean())
     d_tr = ptr[gtr_ == 1].mean() - ptr[gtr_ == 0].mean()
     r2 = qtr.var() / (p1 * (1 - p1))
     price = p1 * (1 - p1) * d_tr ** 2 / r2
     tau = out["dkt_prop5_erased"]["pred_gap"] / out["dkt"]["pred_gap"]
+    tau_raw = gap_raw / out["dkt"]["pred_gap"]
     out["dkt_prop5"] = dict(price=float(price), r2_group=float(r2), tau=float(tau), frontier=float((1 - tau) ** 2 * price),
-                            measured_brier=float(out["dkt_prop5_erased"]["brier"] - out["dkt"]["brier"]))
+                            measured_brier=float(out["dkt_prop5_erased"]["brier"] - out["dkt"]["brier"]),
+                            clip_share=clip_share, tau_unclipped=float(tau_raw),
+                            frontier_unclipped=float((1 - tau_raw) ** 2 * price),
+                            measured_brier_unclipped=float(brier_raw - out["dkt"]["brier"]))
     # how well the hidden state predicts the group (R^2 of the linear group score), for the price formula
     gtr = np.repeat(Gtr, T).astype(float)
     Hc = Htr_np - Htr_np.mean(0)

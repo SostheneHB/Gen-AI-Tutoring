@@ -1,4 +1,4 @@
-# Hiding a Gap Does Not Close It: The Price of Erasing Group Signals from Learned Models of Learning Dynamics — reproduction package (release v1.1)
+# Hiding a Gap Does Not Close It: The Price of Erasing Group Signals from Learned Models of Learning Dynamics — reproduction package (release v1.2)
 
 Every number, table and figure of the revised manuscript is produced by the
 scripts in `scripts/` and `randomized_experiments/code/`. The numerical outputs are not included here: some are derived from licensed data (Eedi, CC BY-NC-ND; ASSISTments) that may not be redistributed. Every output is recomputed by the commands below; the files named in the tables below are the files the scripts write.
@@ -270,4 +270,14 @@ re-identify students. They are not included here. Place `experiment_conditions.c
 `experiment_prior_stats_and_targets.csv` in `randomized_experiments/data/`. `randomized_experiments/notes/`
 holds the analysis plan, written before any outcome was analysed (not publicly registered), with the list of
 later changes, and the analysis code as it was when the plan was fixed.
+
+## Release v1.2: margins applied (post hoc) and clipping check for the DKT erasure
+
+```
+# Margin rule of Table tab:margins, applied after the experiments to every held-out split
+DATA_ROOT=/path/to/data python apply_margins.py           # -> out_reviewer/margins.json
+# Next-item study, now also recording the share of erased DKT predictions outside [0, 1] and the cost of
+# the unclipped erasure (same seeds; every other number is unchanged)
+DATA_ROOT=/path/to/data python next_item.py --dataset eedi
+```
 
