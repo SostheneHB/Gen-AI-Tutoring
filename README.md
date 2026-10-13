@@ -1,8 +1,8 @@
 # Gen-AI-Tutoring
 
-Code for the paper **"Hiding a Gap Does Not Close It: The Price of Erasing Group Signals from Learned Models of Learning Dynamics"**.
+Code for the paper **"Hiding a Gap Does Not Close It: The Price of Removing the Mean Group Contrast from Learned Models of Learning Dynamics"**.
 
-## Reproduction (release v1.2)
+## Reproduction (release v1.3)
 
 Everything needed to recompute the numbers, tables and figures of the paper is in [`reproduction/`](reproduction/):
 

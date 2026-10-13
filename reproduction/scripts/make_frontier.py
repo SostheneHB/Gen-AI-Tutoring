@@ -39,8 +39,8 @@ def main():
     fig.tight_layout()
     fig.savefig(f"{a.dest}/fig_frontier.png")
 
-    out = [r"\begin{tabular}{@{}rlrllll@{}}", r"\toprule",
-           r"\(\gamma\) & Arm & \(|u|\) ratio & \(\Delta|\delta_T|\) & \(\Delta\overline k_{T,0}\) & \(\Delta\overline k_{T,1}\) & worst group (min)\\",
+    out = [r"\begin{tabular}{@{}rlrlllll@{}}", r"\toprule",
+           r"\(\gamma\) & Arm & \(|u|\) ratio & \(\Delta|\delta_T|\) & \(\Delta\overline k_{T,0}\) & \(\Delta\overline k_{T,1}\) & \(\Delta\delta^k_T\) & worst group (min)\\",
            r"\midrule"]
     for i, r in enumerate(R):
         if i:
@@ -50,8 +50,9 @@ def main():
             lab = f"more control, \\(\\rho={x}\\)" if kind == "plain" else f"floor-constrained, \\(c={x}\\)"
             if kind == "plain" and x == "1":
                 continue
+            kgap = e['k1']['mean'] - e['k0']['mean']          # exact mean of the paired change, from unrounded means
             out.append(f"{r['gamma']:g} & {lab} & {e['u_ratio']['mean']:.2f} & {f(e['abs_gap'])} & {f(e['k0'])} & "
-                       f"{f(e['k1'])} & {e['worst']['min']:+.4f}\\\\")
+                       f"{f(e['k1'])} & {kgap:+.3f} & {e['worst']['min']:+.4f}\\\\")
     out += [r"\bottomrule", r"\end{tabular}"]
     open(f"{a.dest}/tab_frontier.tex", "w").write("\n".join(out) + "\n")
 

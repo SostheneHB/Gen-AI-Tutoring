@@ -125,6 +125,14 @@ Clarifications (12 October 2026, written in `code/secondary.py`, which does not 
 3. Reading of the decision rule (Section 7). The 2-point non-inferiority margin is checked for each group
    with the one-sided 5% lower limit of the difference with P2.
 
+Deviation 1 (13 October 2026, after outcomes were seen; `code/global_bootstrap.py`). An external reader noted
+that the same students and classes appear in several experiments. 547 of the 1,788 classes (58% of the
+records) and 5,848 students do. Resampling classes separately inside each experiment ignores this
+dependence. The corrected bootstrap gives each class one weight in all experiments. Point estimates do not
+change. The primary intervals change by at most 0.1 point. In sensitivity 1 (56 experiments), the P5 gap
+interval becomes [-1.9, +0.0] instead of [-1.8, -0.04], so no analysis now gives a significant narrowing.
+The corrected intervals are the ones to report.
+
 Post-hoc additions (13 October 2026, after the outcomes were seen; descriptive only, no test, no change to any
 pre-specified analysis):
 
@@ -132,3 +140,8 @@ pre-specified analysis):
    conditions by group could give (`code/effect_spread.py`, from `outputs/policy_real.json` only). Asked for by a
    referee of the companion simulation study, to show whether any allocation could have moved the gap.
 5. Decision of the authors (13 October 2026): this study is reported as a section of the main paper.
+
+6. Dependence between experiments (13 October 2026, after a referee report; `code/dependence_check.py`): 27% of the
+   students and 31% of the classes appear in more than one experiment. The pooled differences were recomputed with
+   classes, and with students, resampled jointly across experiments. The intervals hardly change (P5 gap: [-1.6, +0.6]
+   and [-1.6, +0.7] against [-1.6, +0.7]). Sensitivity only; the primary analysis is unchanged.

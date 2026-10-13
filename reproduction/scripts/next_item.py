@@ -46,11 +46,11 @@ def prepare_items(df_all, seed, split, strata):
     df = ap.rebuild_dt(df, tr)
     out = []
     for ids in (tr, te):
-        _, X, G, _ = ap.trajectories(df, ids)
+        _, X, G, SCH = ap.trajectories(df, ids)
         sub = df[df["user_id"].isin(ids) & (df["step"] <= T)].sort_values(["user_id", "step"])
         Y = (sub["correct"].values >= 1).reshape(-1, T + 1).astype(float)   # full credit (0.01% partial credit)
         K = sub["skill_id"].values.reshape(-1, T + 1)
-        out.append((X, G, Y, K))
+        out.append((X, G, Y, K, SCH))
     return out
 
 
@@ -83,6 +83,7 @@ def edmd_arms(Xtr, Gtr, Ytr, Xte, Gte, Yte):
         lr = LogisticRegression(max_iter=1000).fit(feats(Xtr, Gtr), Ytr[:, 1:].reshape(-1))
         p = lr.predict_proba(feats(Xte, Gte))[:, 1]
         out[name] = scores(p, Yte[:, 1:].reshape(-1), np.repeat(Gte, T))
+        PRED[name] = p
     return out
 
 
@@ -115,7 +116,60 @@ def leace_binary(H, g):
     return lambda X: X - (X - mu) @ Pm.T
 
 
-def dkt_arms(Ktr, Ytr, Gtr, Kte, Yte, Gte, seed, epochs=int(os.environ.get("DKT_EPOCHS", 20))):
+def prop5_check(model, Htr, Hte, ktr, kte, ytr_np, Ytr, Yte, Gtr, Gte, Ste, nvocab, seed, B=500):
+    """Proposition 1 on DKT with the SAME information on both sides: z = (hidden state, skill of the next item).
+    q is a logistic regression of the group on z (hidden state and a one-hot of the next skill)."""
+    import scipy.sparse as sp
+    n_tr, n_te = Htr.shape[0], Hte.shape[0]
+    with torch.no_grad():
+        ptr = torch.sigmoid(model.logits(Htr, ktr[:, 1:])).numpy().reshape(-1)
+        pte = torch.sigmoid(model.logits(Hte, kte[:, 1:])).numpy().reshape(-1)
+    def design(H, K):
+        Hn = H.numpy().reshape(-1, H.shape[-1])
+        k = K[:, 1:].numpy().reshape(-1)
+        oh = sp.csr_matrix((np.ones(len(k)), (np.arange(len(k)), k)), shape=(len(k), nvocab + 1))
+        return sp.hstack([sp.csr_matrix(Hn), oh]).tocsr()
+    Xq_tr, Xq_te = design(Htr, ktr), design(Hte, kte)
+    gtr, gte = np.repeat(Gtr, T).astype(float), np.repeat(Gte, T).astype(float)
+    ytr, yte = Ytr[:, 1:].reshape(-1), Yte[:, 1:].reshape(-1)
+    qm = LogisticRegression(max_iter=2000, C=1.0).fit(Xq_tr, gtr)
+    qtr, qte = qm.predict_proba(Xq_tr)[:, 1], qm.predict_proba(Xq_te)[:, 1]
+    p1 = gtr.mean()
+    c = np.cov(ptr, qtr)[0, 1] / qtr.var()
+    d_te = -c * (qte - p1)
+    f0 = pte + d_te                                                   # unclipped predictor of Proposition 1
+    PRED["dkt_same_info_removed"] = np.clip(f0, 1e-6, 1 - 1e-6)
+    gap = lambda v, g: v[g == 1].mean() - v[g == 0].mean()
+    r2 = qtr.var() / (p1 * (1 - p1))
+    price = p1 * (1 - p1) * gap(ptr, gtr) ** 2 / r2                   # estimated on the training students
+    # calibration of q on held-out students: slope of a logistic recalibration and expected calibration error
+    lq = np.log(np.clip(qte, 1e-6, 1 - 1e-6) / np.clip(1 - qte, 1e-6, 1))
+    slope = float(LogisticRegression(C=1e6).fit(lq[:, None], gte).coef_[0, 0])
+    bins = np.minimum((qte * 10).astype(int), 9)
+    ece = float(sum(abs(gte[bins == b].mean() - qte[bins == b].mean()) * (bins == b).mean() for b in range(10) if (bins == b).any()))
+    def stats(idx):
+        gg, pp, ff, yy, dd = gte[idx], pte[idx], f0[idx], yte[idx], d_te[idx]
+        tau = gap(ff, gg) / gap(pp, gg)
+        return dict(tau=tau, frontier=(1 - tau) ** 2 * price, measured=((ff - yy) ** 2).mean() - ((pp - yy) ** 2).mean(),
+                    d2=(dd ** 2).mean(), cross=2 * ((pp - yy) * dd).mean())
+    point = stats(np.arange(len(gte)))
+    rows = np.repeat(np.arange(len(Gte)), T).reshape(len(Gte), T)
+    clusters = np.unique(Ste)
+    rng = np.random.default_rng(seed)
+    draws = []
+    for _ in range(B):
+        pick = rng.choice(clusters, len(clusters))
+        idx = np.concatenate([rows[Ste == cl].ravel() for cl in pick])
+        draws.append(stats(idx))
+    ci = {k: [float(np.percentile([d[k] for d in draws], 2.5)), float(np.percentile([d[k] for d in draws], 97.5))] for k in point}
+    diff = [d["measured"] - d["frontier"] for d in draws]
+    return dict(price=float(price), r2_group=float(r2), q_calibration_slope=slope, q_ece=ece,
+                clip_share=float(((f0 < 0) | (f0 > 1)).mean()), **{k: float(v) for k, v in point.items()},
+                ci=ci, measured_minus_frontier_ci=[float(np.percentile(diff, 2.5)), float(np.percentile(diff, 97.5))],
+                n_clusters=int(len(clusters)))
+
+
+def dkt_arms(Ktr, Ytr, Gtr, Kte, Yte, Gte, seed, Ste=None, epochs=int(os.environ.get("DKT_EPOCHS", 20))):
     torch.manual_seed(seed); np.random.seed(seed)
     vocab = {s: i + 1 for i, s in enumerate(np.unique(Ktr))}
     enc = lambda K: np.vectorize(lambda s: vocab.get(s, 0))(K)
@@ -139,6 +193,7 @@ def dkt_arms(Ktr, Ytr, Gtr, Kte, Yte, Gte, seed, epochs=int(os.environ.get("DKT_
         p = torch.sigmoid(model.logits(Hte, kte[:, 1:])).numpy().reshape(-1)
     y, g = Yte[:, 1:].reshape(-1), np.repeat(Gte, T)
     out = {"dkt": scores(p, y, g)}
+    PRED["dkt"] = p
     # group erased from the hidden state, readout refitted (same per-skill form) on the erased training states
     Htr_np, Hte_np = Htr.numpy().reshape(-1, Htr.shape[-1]), Hte.numpy().reshape(-1, Hte.shape[-1])
     E = leace_binary(Htr_np, np.repeat(Gtr, T).astype(float))
@@ -158,6 +213,7 @@ def dkt_arms(Ktr, Ytr, Gtr, Kte, Yte, Gte, seed, epochs=int(os.environ.get("DKT_
         w = head(kte[:, 1:])
         pe = torch.sigmoid((Hte_e * w[..., :-1]).sum(-1) + w[..., -1]).numpy().reshape(-1)
     out["dkt_leace_hidden"] = scores(pe, y, g)
+    PRED["dkt_leace_hidden"] = pe
     # Proposition 5 applied to DKT: f_0 = f - c (q - p1), q = P(g = 1 | hidden state) by logistic regression;
     # cost measured with the Brier score (the MSE of Proposition 5) and compared with the frontier at the achieved tau
     with torch.no_grad():
@@ -170,6 +226,7 @@ def dkt_arms(Ktr, Ytr, Gtr, Kte, Yte, Gte, seed, epochs=int(os.environ.get("DKT_
     f0_raw = p - cc * (qte - p1)                                   # the predictor of Proposition 5 (may leave [0, 1])
     f0 = np.clip(f0_raw, 1e-6, 1 - 1e-6)                           # clipped, for AUC and log-loss
     out["dkt_prop5_erased"] = scores(f0, y, g)
+    PRED["dkt_prop5_erased"] = f0
     clip_share = float(((f0_raw < 0) | (f0_raw > 1)).mean())
     brier_raw = float(((f0_raw - y) ** 2).mean())
     gap_raw = float(f0_raw[g == 1].mean() - f0_raw[g == 0].mean())
@@ -188,6 +245,35 @@ def dkt_arms(Ktr, Ytr, Gtr, Kte, Yte, Gte, seed, epochs=int(os.environ.get("DKT_
     Hc = Htr_np - Htr_np.mean(0)
     coef, *_ = np.linalg.lstsq(Hc, gtr - gtr.mean(), rcond=None)
     out["dkt_hidden_r2_group"] = float((Hc @ coef).var() / gtr.var())
+    if Ste is not None:
+        out["dkt_prop1_same_info"] = prop5_check(model, Htr, Hte, ktr, kte, None, Ytr, Yte, Gtr, Gte, Ste, len(vocab), seed)
+    return out
+
+
+PRED = {}
+
+
+def paired_ci(y, g, Ste, ref="edmd_raw", B=200, seed=0):
+    """Class/school-cluster bootstrap of paired differences (arm minus reference) in AUC and Brier score."""
+    rows = np.repeat(np.arange(len(Ste)), T).reshape(len(Ste), T)
+    clusters = np.unique(Ste)
+    rng = np.random.default_rng(seed)
+    arms = [a for a in PRED if a != ref]
+    point = {a: dict(auc=roc_auc_score(y, PRED[a]) - roc_auc_score(y, PRED[ref]),
+                     brier=((PRED[a] - y) ** 2).mean() - ((PRED[ref] - y) ** 2).mean()) for a in arms}
+    draws = {a: {"auc": [], "brier": []} for a in arms}
+    for _ in range(B):
+        pick = rng.choice(clusters, len(clusters))
+        idx = np.concatenate([rows[Ste == cl].ravel() for cl in pick])
+        yy = y[idx]
+        base_auc, base_b = roc_auc_score(yy, PRED[ref][idx]), ((PRED[ref][idx] - yy) ** 2).mean()
+        for a in arms:
+            draws[a]["auc"].append(roc_auc_score(yy, PRED[a][idx]) - base_auc)
+            draws[a]["brier"].append(((PRED[a][idx] - yy) ** 2).mean() - base_b)
+    out = {}
+    for a in arms:
+        out[a] = {k: dict(diff=float(point[a][k]), ci=[float(np.percentile(draws[a][k], 2.5)), float(np.percentile(draws[a][k], 97.5))]) for k in ("auc", "brier")}
+    out["dkt_same_info_removed_scores"] = scores(PRED["dkt_same_info_removed"], y, g)
     return out
 
 
@@ -202,16 +288,24 @@ def main():
         df = ap.keep_full_trajectories(ap.load_features(f"{ROOT}/Datasets/Eedi_NeurIPS2020/eedi_features_time.csv")); strata = "given"
     runs = []
     for j in range(5):
-        (Xtr, Gtr, Ytr, Ktr), (Xte, Gte, Yte, Kte) = prepare_items(df, seed + 200 + j, "school", strata)
+        (Xtr, Gtr, Ytr, Ktr, _), (Xte, Gte, Yte, Kte, Ste) = prepare_items(df, seed + 200 + j, "school", strata)
+        PRED.clear()
         r = edmd_arms(Xtr, Gtr, Ytr, Xte, Gte, Yte)
-        r.update(dkt_arms(Ktr, Ytr, Gtr, Kte, Yte, Gte, seed + j))
+        r.update(dkt_arms(Ktr, Ytr, Gtr, Kte, Yte, Gte, seed + j, Ste))
+        r["paired_vs_edmd_raw"] = paired_ci(Yte[:, 1:].reshape(-1), np.repeat(Gte, T), Ste, seed=seed + j)
         runs.append(r)
         print(f"split {j}: " + " | ".join(f"{k} auc {v['auc']:.3f} gap {v['pred_gap']:+.3f}" for k, v in r.items() if isinstance(v, dict) and "auc" in v)
               + f" | obs gap {r['dkt']['obs_gap']:+.3f}", flush=True)
-    keys = [k for k in runs[0] if isinstance(runs[0][k], dict) and k != "dkt_prop5"]
+    keys = [k for k in runs[0] if isinstance(runs[0][k], dict) and k not in ("dkt_prop5", "dkt_prop1_same_info", "paired_vs_edmd_raw")]
     summ = {k: {q: float(np.mean([r[k][q] for r in runs])) for q in runs[0][k]} for k in keys}
     summ["dkt_hidden_r2_group"] = float(np.mean([r["dkt_hidden_r2_group"] for r in runs]))
+    pv = runs[0]["paired_vs_edmd_raw"]
+    summ["paired_vs_edmd_raw"] = {a: {k: dict(diff=float(np.mean([r["paired_vs_edmd_raw"][a][k]["diff"] for r in runs])),
+                                              ci_per_split=[r["paired_vs_edmd_raw"][a][k]["ci"] for r in runs]) for k in ("auc", "brier")}
+                                  for a in pv if a != "dkt_same_info_removed_scores"}
+    summ["dkt_same_info_removed"] = {q: float(np.mean([r["paired_vs_edmd_raw"]["dkt_same_info_removed_scores"][q] for r in runs])) for q in pv["dkt_same_info_removed_scores"]}
     summ["dkt_prop5"] = {q: float(np.mean([r["dkt_prop5"][q] for r in runs])) for q in runs[0]["dkt_prop5"]}
+    summ["dkt_prop1_same_info"] = {q: float(np.mean([r["dkt_prop1_same_info"][q] for r in runs])) for q in runs[0]["dkt_prop1_same_info"] if not isinstance(runs[0]["dkt_prop1_same_info"][q], (list, dict))}
     os.makedirs(rm.OUT, exist_ok=True)
     json.dump({"splits": runs, "summary": summ}, open(os.path.join(rm.OUT, f"next_item_{a.dataset}.json"), "w"), indent=1)
     for k in keys:
@@ -220,6 +314,10 @@ def main():
               f"pred gap {s['pred_gap']:+.4f} obs {s['obs_gap']:+.4f}")
     print("DKT hidden R2 of group:", round(summ["dkt_hidden_r2_group"], 4))
     print("Proposition 5 on DKT:", {k: round(v, 5) for k, v in summ["dkt_prop5"].items()})
+    print("Proposition 1, same information:", {k: round(v, 5) for k, v in summ["dkt_prop1_same_info"].items()})
+    for j, r in enumerate(runs):
+        x = r["dkt_prop1_same_info"]
+        print(f"  split {j}: tau {x['tau']:+.3f} frontier {x['frontier']:.4f} {[round(v, 4) for v in x['ci']['frontier']]} measured {x['measured']:.4f} {[round(v, 4) for v in x['ci']['measured']]} cross {x['cross']:+.5f} calib slope {x['q_calibration_slope']:.2f} ECE {x['q_ece']:.4f}")
 
 
 if __name__ == "__main__":

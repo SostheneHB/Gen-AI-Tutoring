@@ -1,4 +1,4 @@
-# Hiding a Gap Does Not Close It: The Price of Erasing Group Signals from Learned Models of Learning Dynamics — reproduction package (release v1.2)
+# Hiding a Gap Does Not Close It: The Price of Removing the Mean Group Contrast from Learned Models of Learning Dynamics — reproduction package (release v1.3)
 
 Every number, table and figure of the revised manuscript is produced by the
 scripts in `scripts/` and `randomized_experiments/code/`. The numerical outputs are not included here: some are derived from licensed data (Eedi, CC BY-NC-ND; ASSISTments) that may not be redistributed. Every output is recomputed by the commands below; the files named in the tables below are the files the scripts write.
@@ -280,4 +280,60 @@ DATA_ROOT=/path/to/data python apply_margins.py           # -> out_reviewer/marg
 # the unclipped erasure (same seeds; every other number is unchanged)
 DATA_ROOT=/path/to/data python next_item.py --dataset eedi
 ```
+
+(The output files named below are written by the scripts; they are not shipped in this repository.)
+
+## Release v1.3 — horizons, DKT, controllers aimed at knowledge: horizons on common starting points, same-information DKT check, controllers aimed at knowledge
+
+```
+# 24. Price over the horizon: direct best linear predictor for each h and the iterated EDMD forecast, on a common
+#     set of six starting points; reports the cross term 2 E[(f - y) d] of the iterated forecast
+DATA_ROOT=/path/to/data python horizon_check.py                 # -> out_rank_matched/horizon_check.json
+# 25. Next-item study; the DKT check now uses the same information (hidden state and next skill) for the
+#     prediction and the group model, with class-bootstrap intervals and the calibration of the group model
+DATA_ROOT=/path/to/data python next_item.py --dataset eedi
+# 26. Controllers aimed at the disparity gap or at the knowledge gap, with and without floors, and a top-up at the
+#     same budget; same group-aware model for every arm, 50 replicates, parallel (about 1 h on 5 cores)
+SIM_DIR=/path/to/sim python knowledge_controller.py --workers 5  # -> out_reviewer/knowledge_controller.json
+```
+
+| Manuscript item | File | Key |
+|---|---|---|
+| Section 7.5, horizon paragraph | `outputs/rank_matched/horizon_check.json` | `summary.<dataset>[i].{direct,iterated}` |
+| Section 7.7, DKT check | `outputs/rank_matched/next_item_eedi.json` | `splits[j].dkt_prop1_same_info.{frontier,measured,cross,ci,q_ece,q_calibration_slope}` |
+| Table `tab:knowledge-controller` | `outputs/reviewer/knowledge_controller.json` | `summary.<gamma>.<arm>.{k0,k1,kgap,abs_kgap,abs_dgap,u1_ratio,u2_ratio}` |
+
+## Release v1.3 — environment and further checks
+
+**Environment.** The environment file of earlier revisions pinned Python 3.13.5 with numpy 1.26.4, a combination that
+conda-forge cannot install. It now pins Python 3.12 with the same package versions. In a new environment built from
+this file, `horizon_check.py` reproduced 450 numbers to within 1.3e-12 and `knowledge_controller.py` (2 replicates)
+966 numbers to within 2.5e-8, against the original environment.
+
+```
+# 27. Horizons on common starting points, now with the forecast error of the raw and projected models
+DATA_ROOT=/path/to/data python horizon_check.py
+# 28. Next-item study with paired cluster-bootstrap intervals of AUC and Brier differences, and the accuracy of
+#     the same-information DKT removal
+DATA_ROOT=/path/to/data python next_item.py --dataset eedi
+DATA_ROOT=/path/to/data python next_item.py --dataset assistments
+# 29. ASSISTments: shuffled labels between schools (50 draws per split)
+python school_permutation.py                                    # -> out_rank_matched/school_permutation.json
+# 30. Eedi: pupils with and without a recorded attribute; OULAD: timing and missing data
+DATA_ROOT=/path/to/data python eedi_inclusion.py
+DATA_ROOT=/path/to/data python oulad_timing.py
+# 31. Group-wise and frontier tables with the change of the knowledge gap
+python make_tables_e50.py --src out_synthetic50 --dest ../figures
+python make_frontier.py --inputs out_frontier_g0.5.json out_frontier_g1.json out_frontier_g2.json --dest ../figures
+# 32. Randomized experiments: dependence between experiments (post-hoc sensitivity, listed in the plan)
+cd ../randomized_experiments/code && python dependence_check.py
+```
+
+| Manuscript item | File | Key |
+|---|---|---|
+| Section 7.5, error ratios on common starting points | `outputs/rank_matched/horizon_check.json` | `summary.<dataset>[i].{mse_raw_test,mse_proj_test,mse_ratio_proj_raw}` |
+| Section 7.7, paired AUC and Brier intervals | `outputs/rank_matched/next_item_<dataset>.json` | `summary.paired_vs_edmd_raw.<arm>.{auc,brier}` |
+| Section 7.5, school-level shuffle | `outputs/rank_matched/school_permutation.json` | `summary`, `splits[j]` |
+| Eedi selected sample; OULAD timing | `outputs/reviewer/eedi_inclusion.json`, `oulad_timing.json` | all keys |
+| Appendix on dependence between randomized experiments | `randomized_experiments/outputs/dependence_check.json` | `overlap`, `classes_joint`, `students_joint` |
 

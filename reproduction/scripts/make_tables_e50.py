@@ -39,6 +39,28 @@ def main_rows(rows):
     return out
 
 
+def add_kgap(lines, S):
+    """Add the change of the signed knowledge gap, with its interval from the paired replicates."""
+    rows = r4.all_settings(S)
+    keep = [dict(gamma=g, beta=b, rank=4, depth=3, horizon=T) for g, b, T in
+            [(0.5, 8, 25), (1.0, 8, 25), (2.0, 8, 25), (-1.0, 8, 25), (1.0, 0, 25), (1.0, 32, 25), (1.0, 8, 50)]]
+    arms = ["effect_mpc_proj_vs_raw", "effect_gap_penalty_vs_raw", "effect_gap_constraint_vs_raw"]
+    vals = [r[a]["kgap"] for cfg in keep for r in rows if all(r["config"][k] == v for k, v in cfg.items()) for a in arms]
+    out, i = [], 0
+    for ln in lines:
+        if ln.startswith("\\begin{tabular}"):
+            ln = "\\begin{tabular}{@{}llllllll@{}}"
+        elif "\\(\\Delta\\overline d_{T,1}\\)" in ln:
+            ln = ln.replace("\\(\\Delta\\overline k_{T,1}\\) &", "\\(\\Delta\\overline k_{T,1}\\) & \\(\\Delta\\delta^k_T\\) &")
+        elif "\\scriptsize" in ln and ln.rstrip().endswith("\\\\"):
+            cells = ln.rstrip().rstrip("\\").split(" & ")
+            cells.insert(5, r4.f(vals[i])); i += 1
+            ln = " & ".join(cells) + "\\\\"
+        out.append(ln)
+    assert i == len(vals), (i, len(vals))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default="out_synthetic50")
@@ -52,6 +74,7 @@ def main():
     w("tab_regimes_full.tex", full)
     w("tab_budget.tex", budget)
     gw, counts = r4.groupwise(S)
+    gw = add_kgap(gw, S)
     w("tab_groupwise.tex", gw)
     w("tab_beta_gap.tex", r4.beta_gap_table(E))
     print(json.dumps(counts, indent=1))
