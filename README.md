@@ -11,7 +11,7 @@ Everything needed to recompute the numbers, tables and figures of the paper is i
   the general price of erasure, the dynamics-only correction, the next-item target with deep knowledge
   tracing, the 50-replicate simulator study, and the experiments answering the external reviews);
 - `reproduction/randomized_experiments/`: the analysis of 30 randomized ASSISTments experiments, with the
-  analysis plan written before any outcome was analysed;
+  analysis plan and the analysis code as hashed before any outcome file was written;
 - `reproduction/environment.yml`: the locked environment (`conda env create -f environment.yml`);
 - `reproduction/README.md`: the commands, in order, with expected run times and data checksums.
 

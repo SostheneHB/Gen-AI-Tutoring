@@ -203,8 +203,8 @@ python balance.py
 python secondary.py                   # per-experiment Holm tests, secondary outcome
 ```
 
-`randomized_experiments/notes/analysis_plan.md` is the analysis plan, fixed before any outcome was
-analysed; its "Deviations" section lists every later change. `notes/analysis_at_approval.py` is the code
+`randomized_experiments/notes/analysis_plan.md` is the analysis plan (not registered; its original text was not
+preserved); its "Deviations" section lists every later change. `notes/analysis_at_approval.py` is the code
 as it was when the plan was fixed. The outputs hold only values pooled over students.
 
 | Manuscript item | File | Key |
@@ -268,8 +268,8 @@ The 30 randomized experiments come from OSF project `k8ph9` (Sales, Prihar, Gagn
 arXiv:2306.06273), under the ASSISTments terms of use: non-commercial use, no redistribution, no attempt to
 re-identify students. They are not included here. Place `experiment_conditions.csv` and
 `experiment_prior_stats_and_targets.csv` in `randomized_experiments/data/`. `randomized_experiments/notes/`
-holds the analysis plan, written before any outcome was analysed (not publicly registered), with the list of
-later changes, and the analysis code as it was when the plan was fixed.
+holds the analysis plan (not registered; its original text was not preserved), with the list of later changes,
+and the analysis code as it was when its SHA-256 hash was recorded, before any outcome file was written.
 
 ## Release v1.2: margins applied (post hoc) and clipping check for the DKT erasure
 
