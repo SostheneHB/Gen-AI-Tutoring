@@ -24,7 +24,7 @@ from their providers; outputs derived from them are not redistributed and are re
 
 ## Archive
 
-Release v1.5 adds the scripts of the audit with explicit targets (see `reproduction/README.md`, "Release v1.5"). Release v1.4 is archived on Zenodo: [doi:10.5281/zenodo.23359853](https://doi.org/10.5281/zenodo.23359853); it adds the scripts of the two last revisions (see `reproduction/README.md`, "Release v1.4"). Release v1.3: [doi:10.5281/zenodo.23342342](https://doi.org/10.5281/zenodo.23342342). Earlier release v1.1: [doi:10.5281/zenodo.23329603](https://doi.org/10.5281/zenodo.23329603).
+Release v1.5 is archived on Zenodo: [doi:10.5281/zenodo.23362913](https://doi.org/10.5281/zenodo.23362913); it adds the scripts of the audit with explicit targets (see `reproduction/README.md`, "Release v1.5"). Release v1.4: [doi:10.5281/zenodo.23359853](https://doi.org/10.5281/zenodo.23359853); it adds the scripts of the two last revisions (see `reproduction/README.md`, "Release v1.4"). Release v1.3: [doi:10.5281/zenodo.23342342](https://doi.org/10.5281/zenodo.23342342). Earlier release v1.1: [doi:10.5281/zenodo.23329603](https://doi.org/10.5281/zenodo.23329603).
 
 ## Other files
 
