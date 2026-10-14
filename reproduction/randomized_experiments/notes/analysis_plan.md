@@ -6,7 +6,7 @@ uses assignment and baseline covariates only). Any change after outcomes are see
 
 ## 1. Why this study
 
-The companion simulation study shows two things about tutoring policies: removing group information does not
+Paper 1 shows, in simulation, two things about tutoring policies: removing group information does not
 narrow a gap, and narrowing a gap without lowering any group needs extra help directed to the group behind.
 Its real-data studies only test *predictions*. The open question (reviewer point 4) is whether a policy
 that uses group information really changes **outcomes** for real students. Randomized experiments, where
@@ -50,7 +50,7 @@ A policy assigns each student to the control or the treatment condition of the e
 | P5 gap-aware with floors | like P4, but a student of the low group gets the arm that is better for the low group, subject to: the estimated completion of each group is not below its value under P2 (floor) | yes |
 
 P2 is the reference ("blind" decision). P5 is the observational counterpart of the floor-constrained
-controller of the simulation study, for a single decision.
+controller of Paper 1, for a single decision.
 
 ## 6. Estimation
 
@@ -101,9 +101,16 @@ correction across experiments. Null results are reported with the same detail as
 - The experiments were designed by other researchers for other questions; conditions vary between
   experiments (hints, feedback, presentation).
 
+## 10. What this adds to the thesis
+
+It gives the first policy-level evidence on real students for the question of Paper 1: does using group
+information to direct help to the students behind narrow a gap without lowering the others? It also
+tests, on real data, the floor-constrained decision rule studied in simulation.
+
 ## Approval
 
-Fixed by the authors on 12 October 2026, before any outcome was analysed. Any later change is listed under "Deviations".
+Approved by the author on 12 October 2026, before any outcome was analysed (file `notes/APPROVED`).
+The supervisor had not yet reviewed the plan at that date. Any later change is listed under "Deviations".
 
 ## Deviations
 
@@ -139,9 +146,24 @@ pre-specified analysis):
 4. Spread of the estimated treatment effects by group and the largest gap change that any allocation of the two
    conditions by group could give (`code/effect_spread.py`, from `outputs/policy_real.json` only). Asked for by a
    referee of the companion simulation study, to show whether any allocation could have moved the gap.
-5. Decision of the authors (13 October 2026): this study is reported as a section of the main paper.
+5. Decision of the authors (13 October 2026): this study is reported as a section of the companion simulation
+   study, not as a separate paper.
 
 6. Dependence between experiments (13 October 2026, after a referee report; `code/dependence_check.py`): 27% of the
    students and 31% of the classes appear in more than one experiment. The pooled differences were recomputed with
    classes, and with students, resampled jointly across experiments. The intervals hardly change (P5 gap: [-1.6, +0.6]
    and [-1.6, +0.7] against [-1.6, +0.7]). Sensitivity only; the primary analysis is unchanged.
+
+7. Primary interval (13 October 2026, after a second external review of the companion study; no new estimate):
+   following the reviewer, the paper now reports the bootstrap that resamples classes jointly across experiments
+   (Deviation 1, `code/global_bootstrap.py`, `outputs/policy_real_globalclass.json`) as the primary analysis. The
+   within-experiment bootstrap of the plan and the joint student bootstrap (item 6) are reported as sensitivity.
+   Point estimates are unchanged; intervals change by at most 0.1 point (P5 gap: [-1.5, +0.7]).
+8. Assignment shares (13 October 2026, `code/randomization_table.py`, no outcome read): for each retained experiment,
+   the treated share overall and in the low and high groups, with binomial tests against 1/2, are reported in an
+   appendix of the paper. The study is reported there as a complementary, exploratory illustration.
+
+## 11. Next steps
+
+Done: plan approved, primary, sensitivity, per-experiment and secondary analyses run
+(`outputs/results_summary.md`). Next: write the paper.

@@ -35,7 +35,7 @@ def check(rows, family):
 
 
 # ---------------------------------------------------------------- synthetic
-def synthetic_rows(sim_path):
+def synthetic_rows(sim_path, n_seeds=10):
     sys.path.insert(0, sim_path)
     import fa_edmd_mpc_v3_corrected as fa
     import synthetic_regimes as sr
@@ -49,7 +49,7 @@ def synthetic_rows(sim_path):
     rows = []
     for g, rank, depth in sorted(configs):
         fa.step = sr.make_step(g)
-        for seed in range(10):
+        for seed in range(n_seeds):
             m = fa.fit_model(seed, rank, depth)
             P, G = m.projector, m.metric
             K = m.propagation.T                       # coefficient operator
@@ -125,9 +125,10 @@ def main():
     a.add_argument("--sim", default="../../Final_Folder_on_DR")
     a.add_argument("--features", default="assistments_features_time.csv")
     a.add_argument("--out", default="out_structural.json")
+    a.add_argument("--seeds", type=int, default=10, help="simulator replicates per setting (50 = every fit of the 50-replicate study)")
     args = a.parse_args()
     out = {}
-    syn = synthetic_rows(args.sim)
+    syn = synthetic_rows(args.sim, args.seeds)
     check(syn, "synthetic")
     out["synthetic_all_fits"] = summarise(syn)
     ass = assistments_rows(args.features)

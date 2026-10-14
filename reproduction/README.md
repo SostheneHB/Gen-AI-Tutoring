@@ -337,3 +337,102 @@ cd ../randomized_experiments/code && python dependence_check.py
 | Eedi selected sample; OULAD timing | `outputs/reviewer/eedi_inclusion.json`, `oulad_timing.json` | all keys |
 | Appendix on dependence between randomized experiments | `randomized_experiments/outputs/dependence_check.json` | `overlap`, `classes_joint`, `students_joint` |
 
+## Release v1.4 — part 1: reliability of the estimated price, controlled study, selected DKT, reference controller
+
+The manuscript was reorganized: the main text now has the price and its estimation (Section 4), a controlled study
+(Section 5), prediction on real data (Section 6), decisions in simulation (Section 7) and the audit protocol
+(Section 8). The randomized experiments moved to an appendix.
+
+```
+# 33. Controlled study of the price and of its estimate: known truth, three alignments of the group signal, three
+#     group separations, two shifts between training and test, two sample sizes, two learners (about 1 h on 2 cores)
+python price_reliability_synthetic.py --workers 2          # -> out_reviewer/price_reliability_synthetic.json
+# 34. Next-item prediction with a DKT selected on validation schools (grid of 12 configurations, early stopping),
+#     four ways of removing the mean contrast, refit bootstrap of the announced price and the interpretability
+#     rule; CPU only (about 25 min per split on ASSISTments and 45 min per split on Eedi with 3 threads)
+DATA_ROOT=/path/to/data python next_item_tuned.py --dataset assistments
+DATA_ROOT=/path/to/data python next_item_tuned.py --dataset eedi              # or several processes with --split-ids
+DATA_ROOT=/path/to/data python next_item_tuned.py --dataset eedi --long --splits 2   # longer histories
+# 35. Controllers against a true-model reference (same objective, information and budget; control weight chosen
+#     on validation cohorts), 20 replicates, three group strengths, two objectives (about 1 h on 3 cores)
+SIM_DIR=/path/to/sim python oracle_reference.py --workers 3                   # -> out_reviewer/oracle_reference.json
+# 36. Data checks: OULAD score-availability delay (0, 1, 2, 4 weeks) and Eedi reweighting by the probability of a
+#     recorded attribute
+DATA_ROOT=/path/to/data python oulad_delay.py                                 # -> out_reviewer/oulad_delay.json
+DATA_ROOT=/path/to/data python eedi_reweight.py                               # -> out_reviewer/eedi_reweight.json
+# 37. Structural test on every fit of the 50-replicate study (650 simulator fits); exits with an error on failure
+python structural_diagnostics.py --sim . --features assistments_features_time.csv --seeds 50 --out ../outputs/out_structural_50.json
+# 38. Randomized experiments: assignment shares per experiment (no outcome read)
+cd ../randomized_experiments/code && python randomization_table.py
+# 39. Tables of this revision
+python make_tables_review6.py --dest ../figures
+```
+
+### Map: every table and figure, its script and its output
+
+| Label in the manuscript | Script (command above) | Output read |
+|---|---|---|
+| `tab:real-summary` | `assistments_pipeline.py` (2), `run_eedi.py` (10), `run_oulad.py` (11), `horizon_check.py` (27), `oulad_delay.py` (36) | `outputs/assistments_time/summary.json`, `outputs/eedi/out_eedi/summary.json`, `outputs/oulad/summary.json`, `outputs/rank_matched/horizon_check.json`, `outputs/reviewer/oulad_delay.json` |
+| `tab:rank-matched`, `fig:rank-matched` (A, B) | `rank_matched_controls.py --part A`, `erasure_price_check.py`, `make_fig_rank_matched.py` (rev. 5) | `outputs/rank_matched/<dataset>.json`, `erasure_price.json` |
+| `tab:erasure-price` | `erasure_price_check.py` (rev. 5) | `outputs/rank_matched/erasure_price.json` |
+| `tab:general-price` | `general_price.py` (13), `make_table_general_price.py` (16) | `outputs/rank_matched/general_price_table.json` |
+| `tab:controlled`, `tab:controlled-full` | `price_reliability_synthetic.py` (33), `make_tables_review6.py` (39) | `outputs/reviewer/price_reliability_synthetic.json` |
+| `tab:next-item`, `tab:next-item-rel`, `tab:next-item-grid` | `next_item_tuned.py` (34), `make_tables_review6.py` (39) | `outputs/rank_matched/next_item_tuned_<dataset>*.json` |
+| `tab:next-item-long` | `next_item_tuned.py --long` (34) | `outputs/rank_matched/next_item_tuned_eedi_long*.json` |
+| `tab:next-item-fixed` | `next_item.py` (28) | `outputs/rank_matched/next_item_<dataset>.json` |
+| `tab:dynamics-only` | `dynamics_only.py` (19) | `outputs/rank_matched/dynamics_only.json` |
+| `tab:regimes`, `fig:regimes`, `tab:replicates50` | `e50_runs.py`, `make_tables_e50.py` (18), `reviewer_experiments.py replicates_full` (15) | `outputs/synthetic50/regimes.json`, `outputs/reviewer/replicates_full.json` |
+| `fig:rank-matched-policy` | `rank_matched_controls.py --part B`, `make_fig_rank_matched.py` (rev. 5) | `outputs/rank_matched/simulator.json` |
+| `tab:oracle`, `tab:oracle-diff` | `oracle_reference.py` (35), `make_tables_review6.py` (39) | `outputs/reviewer/oracle_reference.json` |
+| `tab:knowledge-controller` | `knowledge_controller.py` (26) | `outputs/reviewer/knowledge_controller.json` |
+| `tab:equal-budget`, `tab:scenarios` | `reviewer_experiments.py budget`, `reviewer_experiments.py scenarios` (rev. 5) | `outputs/reviewer/budget.json`, `scenarios.json` |
+| `fig:frontier`, `tab:frontier` | `fair_frontier.py`, `make_frontier.py` (9, 31) | `outputs/out_frontier_g*.json` |
+| `tab:regimes-full`, `tab:budget`, `tab:groupwise`, `tab:beta-gap` | `make_tables_e50.py` (18, 31) | `outputs/synthetic50/regimes.json`, `extras.json` |
+| `fig:horizon50` | `synthetic_extras.py` (8) | `outputs/synthetic_extras.json` |
+| `tab:flow` | `sample_flow.py` (8) | `outputs/sample_flow.csv` |
+| `tab:structural` | `structural_diagnostics.py --seeds 50` (37), `make_tables_R4.py` (8) | `outputs/out_structural_50.json` |
+| `tab:real-primary`, `fig:real-replay`, `tab:baselines`, `fig:real-baselines`, `tab:paired-differences`, `tab:calibration`, `fig:real-calibration`, `tab:real-sensitivity` | `assistments_pipeline.py` (2), `make_tables_R3.py` (7), `make_figures_v2.py` (12) | `outputs/assistments_time/`, `outputs/assistments_pid/` |
+| `tab:eedi`, `fig:eedi-replay`, `fig:eedi-baselines` | `run_eedi.py`, `make_tables_eedi.py`, `make_figures_eedi.py` (10) | `outputs/eedi/` |
+| `tab:oulad`, `fig:oulad-replay`, `fig:oulad-baselines` | `run_oulad.py`, `make_tables_oulad.py`, `make_figures_eedi.py` (11) | `outputs/oulad/` |
+| `tab:oulad-delay` | `oulad_delay.py` (36) | `outputs/reviewer/oulad_delay.json` |
+| Eedi reweighting paragraph | `eedi_reweight.py` (36) | `outputs/reviewer/eedi_reweight.json` |
+| `tab:margins` decisions | `apply_margins.py` (22) | `outputs/reviewer/margins.json` |
+| `fig:edmd`, `fig:paired-effects`, `tab:paired-summary`, `tab:edmd`, `fig:conformal-diagnostics`, `fig:metric-sensitivity`, `tab:metric-sensitivity` | `rebuild_manuscript_results.py` (3) | published bundle |
+| `fig:real-trs` | `assistments_pipeline.py` (2), `make_figures_v2.py` (12) | `outputs/assistments_time/` (per-student arrays regenerated locally, not shipped) |
+| `tab:rct` | `randomized_experiments/code/global_bootstrap.py` | `randomized_experiments/outputs/policy_real_globalclass.json` |
+| `tab:randomization` | `randomized_experiments/code/randomization_table.py` (38) | `randomized_experiments/outputs/randomization_table.json` |
+| Appendix on dependence between experiments | `randomized_experiments/code/dependence_check.py` (32) | `randomized_experiments/outputs/dependence_check.json` |
+| `fig:validation-workflow` | drawn by hand | -- |
+
+Every output listed above is an aggregate; none contains per-student values.
+
+## Release v1.4 — part 2: the cost of a correction built from a group model, three-stage audit
+
+The estimation procedure was revised: the price is now announced on validation units as the cost of the correction
+built from the group model (Proposition `prop:built`), the diagnostic runs on validation units (D1-D3) and the
+correction is confirmed on independent test units (T1-T2). The first version is kept for comparison.
+
+```
+# 40. Controlled study, second version: validation set, both procedures, calibrated-but-misspecified group model,
+#     error and coverage among accepted replicates, test-stage confirmation (about 1 h on 4 cores)
+python price_reliability_synthetic_v2.py --workers 4              # -> out_reviewer/price_reliability_synthetic_v2.json
+# 41. Next-item: the selected DKT retrained with the same configuration and seed; first version, first version after
+#     Platt recalibration, three-stage audit; the four removals compared at the same remaining gap; longer histories
+DATA_ROOT=/path/to/data python next_item_v2.py --dataset assistments
+DATA_ROOT=/path/to/data python next_item_v2.py --dataset eedi
+DATA_ROOT=/path/to/data python next_item_v2.py --dataset eedi --long
+# 42. Reference controller with the known equations: finer search and noise integration (about 20 min on 2 cores)
+SIM_DIR=/path/to/sim python oracle_sensitivity.py --workers 2      # -> out_reviewer/oracle_sensitivity.json
+# 43. Tables of this revision
+python make_tables_review6.py --dest ../figures --only controlled_v2,next_item,next_item_v2,next_item_v2_long,oracle
+```
+
+| Label in the manuscript | Script (command above) | Output read |
+|---|---|---|
+| `tab:controlled`, `tab:controlled-full` (replace part 1) | `price_reliability_synthetic_v2.py` (40), `make_tables_review6.py` (43) | `outputs/reviewer/price_reliability_synthetic_v2.json` |
+| `tab:next-item-rel` (replaces part 1), `tab:next-item-compare` | `next_item_v2.py` (41), `make_tables_review6.py` (43) | `outputs/rank_matched/next_item_v2_<dataset>.json` |
+| `tab:next-item-long-v2` | `next_item_v2.py --long` (41) | `outputs/rank_matched/next_item_v2_eedi_long.json` |
+| Sensitivity of the reference controller (Appendix `app:oracle`) | `oracle_sensitivity.py` (42) | `outputs/reviewer/oracle_sensitivity.json` |
+| Realized budgets of the reference comparison (Section `sec:results-oracle`) | `oracle_reference.py` (35) | `outputs/reviewer/oracle_reference.json`, key `summary.<objective>|<gamma>.matched.<arm>.u1` |
+
+Outputs are not distributed in this repository; the scripts recompute them. No data and no per-student values are included.
