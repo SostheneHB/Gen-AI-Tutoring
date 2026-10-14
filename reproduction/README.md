@@ -436,3 +436,45 @@ python make_tables_review6.py --dest ../figures --only controlled_v2,next_item,n
 | Realized budgets of the reference comparison (Section `sec:results-oracle`) | `oracle_reference.py` (35) | `outputs/reviewer/oracle_reference.json`, key `summary.<objective>|<gamma>.matched.<arm>.u1` |
 
 Outputs are not distributed in this repository; the scripts recompute them. No data and no per-student values are included.
+
+## Release v1.5: explicit targets of the audit, three separate intervals, bootstrap stability
+
+The audit now announces two quantities on validation units: the quadratic part of the cost of the built correction
+and its total cost (quadratic part plus the cross term 2 E[(f - y) d] on validation units). It keeps three
+intervals apart: announced (training units resampled with the group model refitted, and validation units),
+measured (test units only, correction fixed) and their difference (all three resampled). The checks D1-D3 decide
+whether the estimate is accepted; T1-T2 check whether the gap reduction transfers to the test units; the agreement
+of announced and measured cost is judged by the interval of their difference. The controlled study computes, for
+each replicate, the realized cost of the fitted correction on 200,000 independent draws and reports how often each
+interval contains it.
+
+```
+# 44. Controlled study with explicit targets (about 1 h on 3 cores), and bootstrap stability (B = 40, 60, 200, 400)
+python price_reliability_synthetic_v3.py --workers 3                # -> out_reviewer/price_reliability_synthetic_v3.json
+python price_reliability_synthetic_v3.py --workers 1 --stability    # -> out_reviewer/price_reliability_synthetic_v3_stability.json
+# 45. Next-item audit with explicit targets (200 bootstrap draws), a second group score (hidden state only), and the
+#     removals compared at a matched gap (descriptive) and with the intensity set on validation units (usable)
+B_V3=200 DATA_ROOT=/path/to/data python next_item_v3.py --dataset eedi           # about 15 min per split
+B_V3=200 DATA_ROOT=/path/to/data python next_item_v3.py --dataset assistments
+B_V3=200 DATA_ROOT=/path/to/data python next_item_v3.py --dataset eedi --long
+# 46. Tables
+python make_tables_review6.py --dest ../figures --only controlled_v3,next_item,next_item_v3,next_item_v3_long
+```
+
+| Label in the manuscript | Script (command above) | Output read |
+|---|---|---|
+| `tab:controlled`, `tab:controlled-full-ls`, `tab:controlled-full-gb`, `tab:controlled-stability` | `price_reliability_synthetic_v3.py` (44), `make_tables_review6.py` (46) | `out_reviewer/price_reliability_synthetic_v3*.json` |
+| `tab:next-item` (output correction row), `tab:next-item-rel`, `tab:next-item-audit`, `tab:next-item-audit-assist`, `tab:next-item-compare`, `tab:next-item-long-v2` | `next_item_v3.py` (45), `make_tables_review6.py` (46) | `out_rank_matched/next_item_v3_<dataset>*.json` |
+
+**Where the protocol of Table `tab:audit-data` is implemented.**
+
+| Quantity | Units | `next_item_v3.py`, function `analyse` | `price_reliability_synthetic_v3.py`, function `replicate` |
+|---|---|---|---|
+| Predictor `f`, group score `s` | training | network trained before `analyse`; `nt.fit_q(Htr, ...)` | `fit_f(ztr, ...)`, `fit_q(Q(ztr), ...)` |
+| Coefficient, centre, announced quadratic part and total | validation | `announce(fva, sva, gva, yva)` | `ann(fva, qva, gva, yva, ...)` |
+| Announced interval, checks D1-D3 | training (score refitted) + validation | loop over `B` draws: `rows_tr` weights, `fit_q`, `rows_va` resample, `announce` | loop `full`: training weights, refits, validation resample |
+| Measured cost, its interval, T1-T2 | test, correction fixed | `cost_terms(fte, d, yte)`; loops `mdraw`, `tgap` over `rows_te` | `meas`; `bt` over test rows |
+| Measured minus announced | training + validation + test | `diff_total`, `diff_quad`, in the draws of the announced interval with `rows_te` resampled | not used |
+| Target of the controlled study | 200,000 new units | not used | `realised(...)` with the fitted `f`, `q`, coefficient and centre |
+
+Outputs are not distributed in this repository; the scripts recompute them. No data and no per-student values are included.

@@ -75,7 +75,7 @@ def controlled(dest):
 # --------------------------------------------------------------------------- next item
 ARMS = [("edmd_raw", "EDMD, original"), ("edmd_projected", "EDMD, projected"), ("dkt", "DKT, selected on validation"),
         ("leace_hidden", "DKT, LEACE on the hidden state"), ("leace_by_skill", "DKT, LEACE within each next skill"),
-        ("parity_training", "DKT, mean-parity fine-tuning"), ("output_removal", "DKT, removal at the output (Prop.~\\ref{prop:general-price})")]
+        ("parity_training", "DKT, mean-parity fine-tuning"), ("output_removal", "DKT, output correction (Prop.~\\ref{prop:built}), three-stage")]
 
 
 def load_runs(ds):
@@ -90,6 +90,12 @@ def load_runs(ds):
 
 def next_item(dest):
     R = {ds: load_runs(ds) for ds in ("assistments", "eedi")}
+    V3 = {ds: load_v3(ds) for ds in ("assistments", "eedi")}
+    for ds in R:
+        if V3[ds]:
+            for r, r3 in zip(R[ds], V3[ds]):
+                r["scores"]["output_removal"] = r3["scores"]["output_v3"]
+                r["paired_vs_dkt"]["output_removal"] = r3["paired_vs_dkt"]["output_v3"]
     head = [r"\begin{tabular}{@{}lrrrrrrrr@{}}", r"\toprule",
             r" & \multicolumn{4}{c}{ASSISTments (school)} & \multicolumn{4}{c}{Eedi (PremiumPupil)}\\",
             r"\cmidrule(lr){2-5}\cmidrule(l){6-9}",
@@ -344,6 +350,172 @@ def next_item_v2_long(dest):
         out.append(f"{L} items & {np.mean([q['price'] for q in v]):.4f} & \\({np.mean([q['tau'] for q in v]):+.2f}\\) & {np.mean([q['measured']['total'] for q in v]):.4f} & "
                    f"{sum(q['measured_in_price_ci'] for q in v)}/{len(v)} & {sum(q['accepted'] for q in v)}/{len(v)}\\\\")
     w(dest, "tab_next_item_long_v2.tex", out + [r"\bottomrule", r"\end{tabular}"])
+
+
+
+# --------------------------------------------------------------------------- third review round (v3)
+def load_v3(ds, long=False):
+    runs = {}
+    for f in sorted(glob.glob(f"out_rank_matched/next_item_v3_{ds}{'_long' if long else ''}*.json")):
+        if not long and "_long" in f:
+            continue
+        for r in json.load(open(f))["splits"]:
+            runs[r["split"]] = r
+    return [runs[k] for k in sorted(runs)]
+
+
+def iv(c, d=4):
+    return f"[{c[0]:.{d}f}, {c[1]:.{d}f}]"
+
+
+def next_item_v3(dest):
+    R = {ds: load_v3(ds) for ds in ("assistments", "eedi")}
+    R2 = {ds: {r["split"]: r for r in load_v2(ds)} for ds in R}
+    # summary of the three versions, split by split
+    t = [r"\begin{tabular}{@{}llrrrrrrrl@{}}", r"\toprule",
+         r" & & \multicolumn{3}{c}{First version (training units)} & \multicolumn{2}{c}{Platt recalibrated} & \multicolumn{3}{c}{Three-stage audit}\\",
+         r"\cmidrule(lr){3-5}\cmidrule(lr){6-7}\cmidrule(l){8-10}",
+         r"Data & Split & Price & \(\widehat\tau\) & slope & \(\widehat\tau\) & slope & Total announced & \(\widehat\tau\) & Accepted / transfers (failed)\\", r"\midrule"]
+    for ds, nm in (("assistments", "ASSISTments"), ("eedi", "Eedi")):
+        for k, r in enumerate(R[ds]):
+            o = R2[ds][r["split"]]
+            s = r["skill"]
+            fail = ",".join(n for n in ("D1", "D2", "D3") if not s["checks"][n])
+            if s["accepted"] and not s["confirmed"]:
+                fail = ",".join(n for n in ("T1", "T2") if not s["test_checks"][n])
+            acc = ("yes / " + ("yes" if s["confirmed"] else "no")) if s["accepted"] else "no / --"
+            t.append(f"{nm if k == 0 else ''} & {r['split'] + 1} & {o['v1']['price']:.4f} & \\({o['v1']['tau']:+.2f}\\) & {o['v1']['q_slope']:.2f} & "
+                     f"\\({o['v1_platt']['tau']:+.2f}\\) & {o['v1_platt']['q_slope']:.2f} & {s['announced']['total']:.4f} & \\({s['tau']:+.2f}\\) & {acc}{' (' + fail + ')' if fail else ''}\\\\")
+        t.append(r"\addlinespace")
+    w(dest, "tab_next_item_rel.tex", t[:-1] + [r"\bottomrule", r"\end{tabular}"])
+    # the three intervals, one table per data set; point estimates, then intervals on a second line
+    for ds, fname in (("assistments", "tab_next_item_audit_assist.tex"), ("eedi", "tab_next_item_audit_eedi.tex")):
+        a = [r"\begin{tabular}{@{}llrrrrrr@{}}", r"\toprule",
+             r" & & \multicolumn{2}{c}{Announced (training + validation)} & \multicolumn{2}{c}{Measured (test)} & \multicolumn{2}{c}{Measured \(-\) announced}\\",
+             r"\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(l){7-8}",
+             r"Split & & Quadratic \(\widehat\pi_s\) & Total & \(\E d^2\) & Total & Quadratic & Total\\", r"\midrule"]
+        for k, r in enumerate(R[ds]):
+            s = r["skill"]
+            dq = s["measured"]["d2"] - s["announced"]["quad"]
+            dt = s["measured"]["total"] - s["announced"]["total"]
+            a.append(f"{r['split'] + 1} & estimate & {s['announced']['quad']:.4f} & {s['announced']['total']:.4f} & {s['measured']['d2']:.4f} & "
+                     f"{s['measured']['total']:.4f} & \\({dq:+.4f}\\) & \\({dt:+.4f}\\)\\\\")
+            a.append(f" & 95\\% & {iv(s['quad_ci'])} & {iv(s['total_ci'])} & {iv(s['measured_quad_ci'])} & {iv(s['measured_total_ci'])} & "
+                     f"{iv(s['diff_quad_ci'])} & {iv(s['diff_total_ci'])}\\\\")
+            a.append(r"\addlinespace")
+        w(dest, fname, a[:-1] + [r"\bottomrule", r"\end{tabular}"])
+    # comparison at matched gap (Eedi)
+    runs = R["eedi"]
+    names = [("leace_hidden", "LEACE on the hidden state", "frozen"), ("leace_by_skill", "LEACE within each next skill", "frozen"),
+             ("parity_training", "Mean-parity fine-tuning", "retrained")]
+    c = [r"\begin{tabular}{@{}llrrrrrrr@{}}", r"\toprule",
+         r" & & \multicolumn{3}{c}{Method} & \multicolumn{2}{c}{Output corr., \(\widehat\tau\) matched on test} & \multicolumn{2}{c}{Output corr., intensity set on validation}\\",
+         r"\cmidrule(lr){3-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}",
+         r"Method & Network & \(\widehat\tau\) & Cost & cross & Cost & Method \(-\) output: splits \(>0\) & \(\widehat\tau\) & Cost\\", r"\midrule"]
+    for key, nm, kind in names:
+        x = [r["comparison"][key] for r in runs]
+        pos = sum(q["diff_ci"][0] > 0 for q in x)
+        neg = sum(q["diff_ci"][1] < 0 for q in x)
+        c.append(f"{nm} & {kind} & \\({np.mean([q['tau_test'] for q in x]):+.2f}\\) & {np.mean([q['cost']['total'] for q in x]):.4f} & "
+                 f"\\({np.mean([q['cost']['cross'] for q in x]):+.4f}\\) & {np.mean([q['output_same_tau']['total'] for q in x]):.4f} & "
+                 f"{pos}/{len(x)}{' (' + str(neg) + ' \\(<0\\))' if neg else ''} & \\({np.mean([q['output_val_tau']['tau_test'] for q in x]):+.2f}\\) & {np.mean([q['output_val_tau']['total'] for q in x]):.4f}\\\\")
+    v = [r["skill"] for r in runs]
+    c.append(f"Output correction (Prop.~\\ref{{prop:built}}) & frozen & \\({np.mean([q['tau'] for q in v]):+.2f}\\) & {np.mean([q['measured']['total'] for q in v]):.4f} & "
+             f"\\({np.mean([q['measured']['cross'] for q in v]):+.4f}\\) & -- & -- & -- & --\\\\")
+    w(dest, "tab_next_item_compare.tex", c + [r"\bottomrule", r"\end{tabular}"])
+    for ds in R:
+        rs = R[ds]
+        if not rs:
+            continue
+        S = [r["skill"] for r in rs]
+        print(ds, "acc", sum(s["accepted"] for s in S), "conf", sum(s["confirmed"] for s in S), "| quad", [round(s["announced"]["quad"], 4) for s in S],
+              "| total", [round(s["announced"]["total"], 4) for s in S], "| meas", [round(s["measured"]["total"], 4) for s in S],
+              "| d2", [round(s["measured"]["d2"], 4) for s in S], "| tau", [round(s["tau"], 2) for s in S],
+              "| total in CI", [s["total_in_ci"] for s in S], "quad in CI", [s["quad_in_ci"] for s in S],
+              "| diff total CI has 0", [s["diff_total_ci"][0] <= 0 <= s["diff_total_ci"][1] for s in S],
+              "| hidden-only total", [round(r["hidden_only"]["announced"]["total"], 4) for r in rs], "meas", [round(r["hidden_only"]["measured"]["total"], 4) for r in rs],
+              "| clip", [round(r["clip_share"], 4) for r in rs])
+        print("   output auc", [round(r["scores"]["output_v3"]["auc"], 3) for r in rs], "dAUC", [round(r["paired_vs_dkt"]["output_v3"]["auc"]["diff"], 3) for r in rs],
+              "dAUC CI", [[round(x, 3) for x in r["paired_vs_dkt"]["output_v3"]["auc"]["ci"]] for r in rs])
+
+
+def next_item_v3_long(dest):
+    runs = load_v3("eedi", long=True)
+    if not runs:
+        return
+    out = [r"\begin{tabular}{@{}lrrrrrr@{}}", r"\toprule",
+           r"History & Announced total & \(\widehat\tau\) & Measured total & In announced interval & Accepted & Gap reduction transfers\\", r"\midrule"]
+    for L in ("25", "50", "100"):
+        v = [r["results"][L]["skill"] for r in runs]
+        out.append(f"{L} items & {np.mean([q['announced']['total'] for q in v]):.4f} & \\({np.mean([q['tau'] for q in v]):+.2f}\\) & {np.mean([q['measured']['total'] for q in v]):.4f} & "
+                   f"{sum(q['total_in_ci'] for q in v)}/{len(v)} & {sum(q['accepted'] for q in v)}/{len(v)} & {sum(q['confirmed'] for q in v)}/{len(v)}\\\\")
+    w(dest, "tab_next_item_long_v2.tex", out + [r"\bottomrule", r"\end{tabular}"])
+
+
+def controlled_v3(dest):
+    D = json.load(open("out_reviewer/price_reliability_synthetic_v3.json"))["cells"]
+    D1 = json.load(open("out_reviewer/price_reliability_synthetic_v2.json"))["cells"]
+    order = ([f"{al}_a{a}" for al in ("useless", "partial", "aligned") for a in (0.2, 0.7, 1.5)]
+             + ["shift_utility_lost", "shift_utility_gained", "calibrated_misspecified", "calibrated_misspecified_correct_model"])
+
+    def label(c):
+        if c.startswith("shift_utility_lost"):
+            return "Shift: utility lost", "0.7"
+        if c.startswith("shift_utility_gained"):
+            return "Shift: utility gained", "0.7"
+        if c == "calibrated_misspecified":
+            return "Calibrated, misspecified \\(s\\)", "--"
+        if c == "calibrated_misspecified_correct_model":
+            return "Same, correct \\(s\\)", "--"
+        al, a = c.split("_a")
+        return CELL_NAMES[al], a
+    pct = lambda v: "--" if v is None else f"{v:.2f}"
+    main = [r"\begin{tabular}{@{}llrrrrrrrrrrr@{}}", r"\toprule",
+            r" & & & \multicolumn{2}{c}{Population cost} & \multicolumn{2}{c}{Median announced} & \multicolumn{3}{c}{Share of replicates} & \multicolumn{3}{c}{Coverage among accepted}\\",
+            r"\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-10}\cmidrule(l){11-13}",
+            r"Group signal & \(a\) & \(R^2_{\grp}\) & min. & built & v1 & quad. & acc., \(2{,}000\) & acc., \(20{,}000\) & transf., \(20{,}000\) & realized quad. & realized total & built\\",
+            r"\midrule"]
+    for c in order:
+        o2, o, o1 = D[f"{c}|2000|ols"], D[f"{c}|20000|ols"], D1[f"{c}|20000|ols"]
+        name, a = label(c)
+        main.append(f"{name} & {a} & {o1['r2']:.3f} & {o['truth_min']:.3f} & {o['truth_built']:.3f} & {o1['v1']['median']:.3f} & {o['ann_quad_median']:.3f} & "
+                    f"{o2['share_accepted']:.2f} & {o['share_accepted']:.2f} & {o['share_confirmed']:.2f} & "
+                    f"{pct(o['cov_full_quad_realised_val_accepted'])} & {pct(o['cov_full_total_realised_val_accepted'])} & {pct(o['cov_full_quad_built_accepted'])}\\\\")
+        if c in ("useless_a1.5", "partial_a1.5", "aligned_a1.5", "shift_utility_gained"):
+            main.append(r"\addlinespace")
+    w(dest, "tab_controlled.tex", main + [r"\bottomrule", r"\end{tabular}"])
+    for l, fname in (("ols", "tab_controlled_full_ls.tex"), ("gbm", "tab_controlled_full_gb.tex")):
+        full = [r"\begin{tabular}{@{}lrrrrrrrrrrr@{}}", r"\toprule",
+                r" & & \multicolumn{2}{c}{Announced (median)} & \multicolumn{2}{c}{Realized (median)} & & & \multicolumn{3}{c}{Coverage of realized total} & \\",
+                r"\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){9-11}",
+                r"Cell & \(n\) & quad. & total & quad. & total & acc. & transf. & audit & audit, acc. & cond. & cov.\ built, acc.\\",
+                r"\midrule"]
+        for c in order:
+            for n in (2000, 20000):
+                o = D[f"{c}|{n}|{l}"]
+                name, a = label(c)
+                full.append(f"{name}{', ' + chr(92) + '(a=' + a + chr(92) + ')' if a != '--' else ''} & {n} & {o['ann_quad_median']:.3f} & {o['ann_total_median']:.3f} & "
+                            f"{o['realised_val_quad_median']:.3f} & {o['realised_val_total_median']:.3f} & {o['share_accepted']:.2f} & {o['share_confirmed']:.2f} & "
+                            f"{o['cov_full_total_realised_val']:.2f} & {pct(o['cov_full_total_realised_val_accepted'])} & {o['cov_cond_total_realised_val']:.2f} & "
+                            f"{pct(o['cov_full_quad_built_accepted'])}\\\\")
+            full.append(r"\addlinespace")
+        w(dest, fname, full[:-1] + [r"\bottomrule", r"\end{tabular}"])
+    try:
+        S = json.load(open("out_reviewer/price_reliability_synthetic_v3_stability.json"))["cells"]
+    except FileNotFoundError:
+        return
+    st = [r"\begin{tabular}{@{}llrrrrrrrr@{}}", r"\toprule",
+          r" & & \multicolumn{4}{c}{Coverage of realized total} & \multicolumn{4}{c}{Largest end-point change vs.\ \(B=400\) (share of width)}\\",
+          r"\cmidrule(lr){3-6}\cmidrule(l){7-10}",
+          r"Cell & Learner & \(B=40\) & 60 & 200 & 400 & 40 & 60 & 200 & 400\\", r"\midrule"]
+    for key, o in S.items():
+        c, n, l = key.split("|")
+        name, a = label(c)
+        s = o["stability"]
+        st.append(f"{name}{', ' + chr(92) + '(a=' + a + chr(92) + ')' if a != '--' else ''} & {'LS' if l == 'ols' else 'GB'} & "
+                  + " & ".join(f"{s[f'{b}_total_cov_realised_val']:.2f}" for b in (40, 60, 200, 400)) + " & "
+                  + " & ".join(f"{s[f'{b}_total_endpoint_rel_dev_median']:.2f}" for b in (40, 60, 200, 400)) + "\\\\")
+    w(dest, "tab_controlled_stability.tex", st + [r"\bottomrule", r"\end{tabular}"])
 
 
 if __name__ == "__main__":
