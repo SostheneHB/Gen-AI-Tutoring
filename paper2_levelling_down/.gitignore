@@ -1,0 +1,9 @@
+# never commit data or outputs
+data/
+outputs/
+logs/
+*.csv
+*.json
+*.parquet
+*.npz
+__pycache__/
