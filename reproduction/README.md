@@ -478,3 +478,38 @@ python make_tables_review6.py --dest ../figures --only controlled_v3,next_item,n
 | Target of the controlled study | 200,000 new units | not used | `realised(...)` with the fitted `f`, `q`, coefficient and centre |
 
 Outputs are not distributed in this repository; the scripts recompute them. No data and no per-student values are included.
+
+## Release v1.6: more bootstrap draws, other thresholds, a fourth split, clipped and unclipped correction
+
+The controlled study is run again with 1,000 bootstrap draws per replicate. The data of every replicate and its
+first 60 draws are those of step 44, so the 60-draw coverage of step 44 is reproduced exactly. From the same draws
+the script also computes the basic bootstrap interval, and it stores the parts of the diagnostic so that the
+coverage and the shares can be computed for other thresholds (D3: 0.25, 0.5, 1, none; T2: 0.1, 0.2, 0.3).
+
+The next-item audit is run with a fourth split: the validation schools or classes of `next_item_v3.py` are divided
+into two halves with about the same number of students. The first half selects the network, stops its training and
+the refit of the LEACE readouts, and sets the weight of mean-parity fine-tuning; the second half only announces the
+cost and runs D1-D3. The output correction is also applied to the test units with and without clipping to [0, 1].
+The group-score fit `fit_q` (L-BFGS in single precision, several threads) is not bit-reproducible, so the script
+caches it within a run; a rerun can differ from the published numbers in the third or fourth decimal.
+
+```
+# 47. Controlled study with 1,000 draws, basic interval, other thresholds (about 5 h on 3 workers x 2 threads)
+python price_reliability_synthetic_v4.py --workers 3            # -> out_reviewer/price_reliability_synthetic_v4.json
+# 48. Next-item audit with a fourth split, clipped and unclipped correction (Eedi about 3 h, ASSISTments about 1.5 h)
+B_V3=400 TORCH_THREADS=3 DATA_ROOT=/path/to/data python next_item_v4.py --dataset eedi         # -> out_rank_matched/next_item_v4_eedi.json
+B_V3=400 TORCH_THREADS=3 DATA_ROOT=/path/to/data python next_item_v4.py --dataset assistments  # -> out_rank_matched/next_item_v4_assistments.json
+# 49. Tables of this part (run controlled_v3 first: controlled_v4 then writes tab_controlled.tex with 1,000 draws)
+python make_tables_review6.py --dest ../figures --only controlled_v3,controlled_v4,next_item_v4
+```
+
+| Label in the manuscript | Script (command above) | Output read |
+|---|---|---|
+| `tab:controlled` (panel b: acceptance, transfer, coverage and width with 1,000 draws; panel a from step 44), `tab:controlled-robust` (1,000 draws, basic interval, thresholds of D3 and T2) | `price_reliability_synthetic_v4.py` (47), `make_tables_review6.py` (49) | `out_reviewer/price_reliability_synthetic_v4.json` (and `_v2`, `_v3` for panel a) |
+| `tab:next-item-audit-main` (the audit with four sets of units: announced cost, interval and width, measured cost, decision), `tab:next-item-v4` (three sets of units against four; clipped and unclipped correction) | `next_item_v4.py` (48), `make_tables_review6.py` (49) | `out_rank_matched/next_item_v4_<dataset>.json` (and `next_item_v3_<dataset>.json` for the comparison) |
+
+In the paper, Table `tab:controlled` (panel b) and the main next-item audit `tab:next-item-audit-main` use the results
+of this part; the 60-draw panel b of step 44 is written to `tab_controlled_b60.tex` for comparison. This release also
+updates `make_tables_R4.py`, where the Gram matrix is now written `G_Gram` (the group keeps the letter G).
+
+Outputs are not distributed in this repository; the scripts recompute them. No data and no per-student values are included.

@@ -107,7 +107,7 @@ def structural_table(D):
              ("requested rank", lambda v, k: ir(v["requested_rank"])),
              ("candidate rank", lambda v, k: ir(v["candidate_rank"])),
              ("applied rank", lambda v, k: ir(v["applied_rank"])),
-             (r"numerical rank of \(G\)", lambda v, k: ir(v["numerical_rank_G"])),
+             (r"numerical rank of \(\Gram\)", lambda v, k: ir(v["numerical_rank_G"])),
              ("relative SVD cutoff", lambda v, k: e(v["svd_cutoff"][1]))]
     for lab, fn in lines:
         out.append(lab + " & " + " & ".join(fn(v, k) for v, (k, _) in zip(V, fams)) + r"\\")

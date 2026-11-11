@@ -406,21 +406,24 @@ def next_item_v3(dest):
         w(dest, fname, a[:-1] + [r"\bottomrule", r"\end{tabular}"])
     # comparison at matched gap (Eedi)
     runs = R["eedi"]
-    names = [("leace_hidden", "LEACE on the hidden state", "frozen"), ("leace_by_skill", "LEACE within each next skill", "frozen"),
-             ("parity_training", "Mean-parity fine-tuning", "retrained")]
-    c = [r"\begin{tabular}{@{}llrrrrrrr@{}}", r"\toprule",
-         r" & & \multicolumn{3}{c}{Method} & \multicolumn{2}{c}{Output corr., \(\widehat\tau\) matched on test} & \multicolumn{2}{c}{Output corr., intensity set on validation}\\",
-         r"\cmidrule(lr){3-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}",
-         r"Method & Network & \(\widehat\tau\) & Cost & cross & Cost & Method \(-\) output: splits \(>0\) & \(\widehat\tau\) & Cost\\", r"\midrule"]
+    names = [("leace_hidden", "LEACE, hidden state", "frozen"), ("leace_by_skill", "LEACE, within next skill", "frozen"),
+             ("parity_training", "Mean-parity fine-tuning\\(^{\\dagger}\\)", "retrained")]
+    # readable at full size: no resizebox, three header rows, the network kind in a footnote mark
+    c = [r"\begin{tabular}{@{}lrrrrrrr@{}}", r"\toprule",
+         r" & \multicolumn{3}{c}{Method} & \multicolumn{4}{c}{Output correction at the same gap}\\",
+         r"\cmidrule(lr){2-4}\cmidrule(l){5-8}",
+         r" & & & & \multicolumn{2}{c}{matched on test} & \multicolumn{2}{c}{set on validation}\\",
+         r"\cmidrule(lr){5-6}\cmidrule(l){7-8}",
+         r"Method & \(\widehat\tau\) & Cost & Cross & Cost & splits \(>0\) & \(\widehat\tau\) & Cost\\", r"\midrule"]
     for key, nm, kind in names:
         x = [r["comparison"][key] for r in runs]
         pos = sum(q["diff_ci"][0] > 0 for q in x)
         neg = sum(q["diff_ci"][1] < 0 for q in x)
-        c.append(f"{nm} & {kind} & \\({np.mean([q['tau_test'] for q in x]):+.2f}\\) & {np.mean([q['cost']['total'] for q in x]):.4f} & "
+        c.append(f"{nm} & \\({np.mean([q['tau_test'] for q in x]):+.2f}\\) & {np.mean([q['cost']['total'] for q in x]):.4f} & "
                  f"\\({np.mean([q['cost']['cross'] for q in x]):+.4f}\\) & {np.mean([q['output_same_tau']['total'] for q in x]):.4f} & "
                  f"{pos}/{len(x)}{' (' + str(neg) + ' \\(<0\\))' if neg else ''} & \\({np.mean([q['output_val_tau']['tau_test'] for q in x]):+.2f}\\) & {np.mean([q['output_val_tau']['total'] for q in x]):.4f}\\\\")
     v = [r["skill"] for r in runs]
-    c.append(f"Output correction (Prop.~\\ref{{prop:built}}) & frozen & \\({np.mean([q['tau'] for q in v]):+.2f}\\) & {np.mean([q['measured']['total'] for q in v]):.4f} & "
+    c.append(f"Output correction (Prop.~\\ref{{prop:built}}) & \\({np.mean([q['tau'] for q in v]):+.2f}\\) & {np.mean([q['measured']['total'] for q in v]):.4f} & "
              f"\\({np.mean([q['measured']['cross'] for q in v]):+.4f}\\) & -- & -- & -- & --\\\\")
     w(dest, "tab_next_item_compare.tex", c + [r"\bottomrule", r"\end{tabular}"])
     for ds in R:
@@ -470,20 +473,27 @@ def controlled_v3(dest):
         al, a = c.split("_a")
         return CELL_NAMES[al], a
     pct = lambda v: "--" if v is None else f"{v:.2f}"
-    main = [r"\begin{tabular}{@{}llrrrrrrrrrrr@{}}", r"\toprule",
-            r" & & & \multicolumn{2}{c}{Population cost} & \multicolumn{2}{c}{Median announced} & \multicolumn{3}{c}{Share of replicates} & \multicolumn{3}{c}{Coverage among accepted}\\",
-            r"\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-10}\cmidrule(l){11-13}",
-            r"Group signal & \(a\) & \(R^2_{\grp}\) & min. & built & v1 & quad. & acc., \(2{,}000\) & acc., \(20{,}000\) & transf., \(20{,}000\) & realized quad. & realized total & built\\",
-            r"\midrule"]
+    # readable at full size: panel (a) the price and its announcement, panel (b) the audit
+    pa = [r"\textbf{(a) Price and announced cost}\\[2pt]", r"\begin{tabular}{@{}llrrrrr@{}}", r"\toprule",
+          r" & & & \multicolumn{2}{c}{Population cost} & \multicolumn{2}{c}{Median announced}\\",
+          r"\cmidrule(lr){4-5}\cmidrule(l){6-7}",
+          r"Group signal & \(a\) & \(R^2_{\grp}\) & minimum & built & v1 & quadratic\\", r"\midrule"]
+    pb = [r"\textbf{(b) Audit: acceptance, transfer and coverage}\\[2pt]", r"\begin{tabular}{@{}llrrrrrr@{}}", r"\toprule",
+          r" & & \multicolumn{2}{c}{Accepted} & Transfers & \multicolumn{3}{c}{Coverage among accepted}\\",
+          r"\cmidrule(lr){3-4}\cmidrule(lr){5-5}\cmidrule(l){6-8}",
+          r"Group signal & \(a\) & \(n=2{,}000\) & \(20{,}000\) & \(20{,}000\) & real.\ quad. & real.\ total & built\\", r"\midrule"]
     for c in order:
         o2, o, o1 = D[f"{c}|2000|ols"], D[f"{c}|20000|ols"], D1[f"{c}|20000|ols"]
         name, a = label(c)
-        main.append(f"{name} & {a} & {o1['r2']:.3f} & {o['truth_min']:.3f} & {o['truth_built']:.3f} & {o1['v1']['median']:.3f} & {o['ann_quad_median']:.3f} & "
-                    f"{o2['share_accepted']:.2f} & {o['share_accepted']:.2f} & {o['share_confirmed']:.2f} & "
-                    f"{pct(o['cov_full_quad_realised_val_accepted'])} & {pct(o['cov_full_total_realised_val_accepted'])} & {pct(o['cov_full_quad_built_accepted'])}\\\\")
+        pa.append(f"{name} & {a} & {o1['r2']:.3f} & {o['truth_min']:.3f} & {o['truth_built']:.3f} & {o1['v1']['median']:.3f} & {o['ann_quad_median']:.3f}\\\\")
+        pb.append(f"{name} & {a} & {o2['share_accepted']:.2f} & {o['share_accepted']:.2f} & {o['share_confirmed']:.2f} & "
+                  f"{pct(o['cov_full_quad_realised_val_accepted'])} & {pct(o['cov_full_total_realised_val_accepted'])} & {pct(o['cov_full_quad_built_accepted'])}\\\\")
         if c in ("useless_a1.5", "partial_a1.5", "aligned_a1.5", "shift_utility_gained"):
-            main.append(r"\addlinespace")
-    w(dest, "tab_controlled.tex", main + [r"\bottomrule", r"\end{tabular}"])
+            pa.append(r"\addlinespace")
+            pb.append(r"\addlinespace")
+    # tab_controlled.tex is written by controlled_v4: panel (a) is the same, panel (b) uses 1,000 draws; the 60-draw
+    # panel (b) is kept as tab_controlled_b60.tex
+    w(dest, "tab_controlled_b60.tex", pb + [r"\bottomrule", r"\end{tabular}"])
     for l, fname in (("ols", "tab_controlled_full_ls.tex"), ("gbm", "tab_controlled_full_gb.tex")):
         full = [r"\begin{tabular}{@{}lrrrrrrrrrrr@{}}", r"\toprule",
                 r" & & \multicolumn{2}{c}{Announced (median)} & \multicolumn{2}{c}{Realized (median)} & & & \multicolumn{3}{c}{Coverage of realized total} & \\",
@@ -505,7 +515,7 @@ def controlled_v3(dest):
     except FileNotFoundError:
         return
     st = [r"\begin{tabular}{@{}llrrrrrrrr@{}}", r"\toprule",
-          r" & & \multicolumn{4}{c}{Coverage of realized total} & \multicolumn{4}{c}{Largest end-point change vs.\ \(B=400\) (share of width)}\\",
+          r" & & \multicolumn{4}{c}{Coverage of realized total} & \multicolumn{4}{c}{End-point change vs.\ \(B=400\)}\\",
           r"\cmidrule(lr){3-6}\cmidrule(l){7-10}",
           r"Cell & Learner & \(B=40\) & 60 & 200 & 400 & 40 & 60 & 200 & 400\\", r"\midrule"]
     for key, o in S.items():
@@ -516,6 +526,119 @@ def controlled_v3(dest):
                   + " & ".join(f"{s[f'{b}_total_cov_realised_val']:.2f}" for b in (40, 60, 200, 400)) + " & "
                   + " & ".join(f"{s[f'{b}_total_endpoint_rel_dev_median']:.2f}" for b in (40, 60, 200, 400)) + "\\\\")
     w(dest, "tab_controlled_stability.tex", st + [r"\bottomrule", r"\end{tabular}"])
+
+
+# --------------------------------------------------------------------------- review of 31 October 2026 (v4)
+def controlled_v4(dest):
+    """More draws, a second interval and other thresholds (price_reliability_synthetic_v4.py), least squares."""
+    D = json.load(open("out_reviewer/price_reliability_synthetic_v4.json"))["cells"]
+    order = ([f"{al}_a{a}" for al in ("useless", "partial", "aligned") for a in (0.2, 0.7, 1.5)]
+             + ["shift_utility_lost", "shift_utility_gained", "calibrated_misspecified", "calibrated_misspecified_correct_model"])
+    zero = {"useless_a0.2", "useless_a0.7", "useless_a1.5", "shift_utility_gained"}
+
+    def label(c):
+        if c.startswith("shift_utility_lost"):
+            return "Shift: utility lost", "0.7"
+        if c.startswith("shift_utility_gained"):
+            return "Shift: utility gained", "0.7"
+        if c == "calibrated_misspecified":
+            return "Calibrated, misspecified \\(s\\)", "--"
+        if c == "calibrated_misspecified_correct_model":
+            return "Same, correct \\(s\\)", "--"
+        al, a = c.split("_a")
+        return CELL_NAMES[al], a
+    pct = lambda v: "--" if v is None else f"{v:.2f}"
+    pa = [r"\textbf{(a) Coverage of the realized total cost among accepted replicates}\\[2pt]", r"\begin{tabular}{@{}llrrrrrr@{}}", r"\toprule",
+          r" & & \multicolumn{3}{c}{\(n=2{,}000\)} & \multicolumn{3}{c}{\(n=20{,}000\)}\\",
+          r"\cmidrule(lr){3-5}\cmidrule(l){6-8}",
+          r" & & \multicolumn{2}{c}{percentile} & basic & \multicolumn{2}{c}{percentile} & basic\\",
+          r"Group signal & \(a\) & \(B=60\) & 1{,}000 & 1{,}000 & \(B=60\) & 1{,}000 & 1{,}000\\", r"\midrule"]
+    pb = [r"\textbf{(b) Other thresholds: share accepted (D3) and share that transfers (T2)}\\[2pt]", r"\begin{tabular}{@{}llrrrrrrr@{}}", r"\toprule",
+          r" & & \multicolumn{4}{c}{Accepted} & \multicolumn{3}{c}{Transfers}\\",
+          r" & & \multicolumn{4}{c}{D3, \(n=2{,}000\)} & \multicolumn{3}{c}{T2, \(n=20{,}000\)}\\",
+          r"\cmidrule(lr){3-6}\cmidrule(l){7-9}",
+          r"Group signal & \(a\) & 0.25 & 0.5 & 1 & none & 0.1 & 0.2 & 0.3\\", r"\midrule"]
+    for c in order:
+        o2, o = D[f"{c}|2000|ols"], D[f"{c}|20000|ols"]
+        name, a = label(c)
+        if c not in zero:
+            pa.append(f"{name} & {a} & " + " & ".join(pct(x[f"cov_{k}_total_d3_0.5"]) for x in (o2, o) for k in ("pct_60", "pct", "basic")) + "\\\\")
+        pb.append(f"{name} & {a} & " + " & ".join(f"{o2[f'share_accepted_d3_{k}']:.2f}" for k in ("0.25", "0.5", "1.0", "none")) + " & "
+                  + " & ".join(f"{o[f'share_transfers_d3_0.5_t2_{t}']:.2f}" for t in (0.1, 0.2, 0.3)) + "\\\\")
+        if c in ("partial_a1.5", "aligned_a1.5"):
+            pa.append(r"\addlinespace")
+        if c in ("useless_a1.5", "partial_a1.5", "aligned_a1.5", "shift_utility_gained"):
+            pb.append(r"\addlinespace")
+    w(dest, "tab_controlled_robust.tex", pa + [r"\bottomrule", r"\end{tabular}", r"", r"\bigskip", r""] + pb + [r"\bottomrule", r"\end{tabular}"])
+
+    # main table: panel (a) the price and its announcement (point estimates, the same as with 60 draws), panel (b) the
+    # audit with 1,000 draws, read together for each sample size: acceptance, transfer, coverage and relative width
+    D3, D2 = json.load(open("out_reviewer/price_reliability_synthetic_v3.json"))["cells"], json.load(open("out_reviewer/price_reliability_synthetic_v2.json"))["cells"]
+    ta = [r"\textbf{(a) Price and announced cost}\\[2pt]", r"\begin{tabular}{@{}llrrrrr@{}}", r"\toprule",
+          r" & & & \multicolumn{2}{c}{Population cost} & \multicolumn{2}{c}{Median announced}\\",
+          r"\cmidrule(lr){4-5}\cmidrule(l){6-7}",
+          r"Group signal & \(a\) & \(R^2_{\grp}\) & minimum & built & v1 & quadratic\\", r"\midrule"]
+    tb = [r"\textbf{(b) Audit with 1{,}000 bootstrap draws: acceptance, transfer, coverage and width}\\[2pt]", r"\begin{tabular}{@{}llrrrrrrrr@{}}", r"\toprule",
+          r" & & \multicolumn{4}{c}{\(n=2{,}000\)} & \multicolumn{4}{c}{\(n=20{,}000\)}\\",
+          r"\cmidrule(lr){3-6}\cmidrule(l){7-10}",
+          r"Group signal & \(a\) & acc. & transf. & cov. & width & acc. & transf. & cov. & width\\", r"\midrule"]
+    rel = lambda o, c: "--" if c in zero else f"{o['width_pct_total_median'] / o['realised_val_total_median']:.2f}"
+    for c in order:
+        o3, o1 = D3[f"{c}|20000|ols"], D2[f"{c}|20000|ols"]
+        name, a = label(c)
+        ta.append(f"{name} & {a} & {o1['r2']:.3f} & {o3['truth_min']:.3f} & {o3['truth_built']:.3f} & {o1['v1']['median']:.3f} & {o3['ann_quad_median']:.3f}\\\\")
+        tb.append(f"{name} & {a} & " + " & ".join(
+            f"{o['share_accepted_d3_0.5']:.2f} & {o['share_transfers_d3_0.5_t2_0.2']:.2f} & {pct(o['cov_pct_total_d3_0.5'])} & {rel(o, c)}"
+            for o in (D[f"{c}|2000|ols"], D[f"{c}|20000|ols"])) + "\\\\")
+        if c in ("useless_a1.5", "partial_a1.5", "aligned_a1.5", "shift_utility_gained"):
+            ta.append(r"\addlinespace")
+            tb.append(r"\addlinespace")
+    w(dest, "tab_controlled.tex", ta + [r"\bottomrule", r"\end{tabular}", r"", r"\bigskip", r""] + tb + [r"\bottomrule", r"\end{tabular}"])
+
+
+def next_item_v4(dest):
+    """Fourth split (selection apart from announcement) and the clipped output correction (next_item_v4.py)."""
+    R = {ds: json.load(open(f"out_rank_matched/next_item_v4_{ds}.json"))["splits"] for ds in ("assistments", "eedi")}
+    R3 = {ds: {r["split"]: r for r in load_v3(ds)} for ds in R}
+    # appendix panel (a): the same audit with three sets of units (validation also selects) and with four
+    pa = [r"\textbf{(a) Three sets of units against four}\\[2pt]", r"\begin{tabular}{@{}llrrrrrrrrll@{}}", r"\toprule",
+          r" & & \multicolumn{2}{c}{AUC of DKT} & \multicolumn{2}{c}{Announced total} & \multicolumn{2}{c}{Interval width} & \multicolumn{2}{c}{Measured (test)} & \multicolumn{2}{c}{Decision}\\",
+          r"\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}\cmidrule(lr){9-10}\cmidrule(l){11-12}",
+          r"Data & Split & three & four & three & four & three & four & three & four & three & four\\", r"\midrule"]
+    # main table: the audit with four sets of units, the four things to read together
+    pm = [r"\begin{tabular}{@{}lrlrrll@{}}", r"\toprule",
+          r" & \multicolumn{3}{c}{Announced total cost} & Measured & Measured \(-\) & \\",
+          r"\cmidrule(lr){2-4}",
+          r"Split & estimate & 95\% interval & width & (test) & announced, 95\% & Decision\\", r"\midrule"]
+    dec = lambda s: ("tr." if s["confirmed"] else "acc.") if s["accepted"] else "abst."
+    pb = [r"\textbf{(b) The output correction on test units, unclipped and clipped to \([0,1]\)}\\[2pt]", r"\begin{tabular}{@{}llrrrrrc@{}}", r"\toprule",
+          r" & & Outside & \multicolumn{2}{c}{Extra Brier score} & \multicolumn{2}{c}{\(\widehat\tau\)} & Clipped cost in\\",
+          r"\cmidrule(lr){4-5}\cmidrule(lr){6-7}",
+          r"Data & Split & \([0,1]\) & unclipped & clipped & unclipped & clipped & announced interval\\", r"\midrule"]
+    for ds, nm in (("eedi", "Eedi, new classes"), ("assistments", "ASSISTments, new schools")):
+        pm.append(f"\\multicolumn{{7}}{{@{{}}l}}{{\\emph{{{nm}}}}}\\\\")
+        for k, r in enumerate(sorted(R[ds], key=lambda r: r["split"])):
+            s, s3 = r["skill"], R3[ds][r["split"]]["skill"]
+            fail = ", ".join(n for n in ("D1", "D2", "D3") if not s["checks"][n])
+            if s["accepted"]:
+                d = ("transfers" if s["confirmed"] else "does not transfer ("
+                     + ", ".join(n for n in ("T1", "T2") if not s["test_checks"][n]) + ")") + f", \\(\\widehat\\tau={s['tau']:+.2f}\\)"
+                d = "accepted; " + d
+            else:
+                d = f"abstains ({fail})"
+            pm.append(f"{r['split'] + 1} & {s['announced']['total']:.4f} & {iv(s['total_ci']).replace('-0.0000', '0.0000')} & {s['total_ci'][1] - s['total_ci'][0]:.4f} & "
+                      f"{s['measured']['total']:.4f} & {iv(s['diff_total_ci']).replace('-0.0000', '0.0000')} & {d}\\\\")
+            wd = lambda x: x["total_ci"][1] - x["total_ci"][0]
+            pa.append(f"{nm.split(',')[0] if k == 0 else ''} & {r['split'] + 1} & {R3[ds][r['split']]['scores']['dkt']['auc']:.3f} & {r['scores']['dkt']['auc']:.3f} & "
+                      f"{s3['announced']['total']:.4f} & {s['announced']['total']:.4f} & {wd(s3):.4f} & {wd(s):.4f} & "
+                      f"{s3['measured']['total']:.4f} & {s['measured']['total']:.4f} & {dec(s3)} & {dec(s)}\\\\")
+            c = r["clip"]["test"]
+            pb.append(f"{nm.split(',')[0] if k == 0 else ''} & {r['split'] + 1} & {100 * c['share_out']['est']:.1f}\\% & {c['cost']['est']:.4f} & {c['cost_clip']['est']:.4f} & "
+                      f"\\({c['tau']['est']:+.2f}\\) & \\({c['tau_clip']['est']:+.2f}\\) & {'yes' if r['clip']['test_clip_cost_in_announced_ci'] else 'no'}\\\\")
+        for t in (pm, pa, pb):
+            t.append(r"\addlinespace")
+    w(dest, "tab_next_item_audit_main.tex", pm[:-1] + [r"\bottomrule", r"\end{tabular}"])
+    w(dest, "tab_next_item_v4.tex", pa[:-1] + [r"\bottomrule", r"\end{tabular}", r"", r"\bigskip", r""] + pb[:-1] + [r"\bottomrule", r"\end{tabular}"])
 
 
 if __name__ == "__main__":
