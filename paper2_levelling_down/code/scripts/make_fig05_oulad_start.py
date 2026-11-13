@@ -46,5 +46,6 @@ h, l = axes[0].get_legend_handles_labels()
 fig.legend(h, l, loc="lower center", ncol=4, frameon=False, fontsize=8.5)
 fig.tight_layout(rect=(0, 0.08, 1, 1))
 out = ROOT / "figures" / "fig05_oulad_start.png"
+out.parent.mkdir(parents=True, exist_ok=True)
 fig.savefig(out, dpi=200)
 print("written", out)

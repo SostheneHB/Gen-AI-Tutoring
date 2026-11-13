@@ -41,5 +41,6 @@ for ax in axes[1]:
     ax.set_xlabel("week", fontsize=9, color=INK)
 fig.tight_layout()
 out = ROOT / "figures" / "fig06_oulad_imputation.png"
+out.parent.mkdir(parents=True, exist_ok=True)
 fig.savefig(out, dpi=200)
 print("written", out)

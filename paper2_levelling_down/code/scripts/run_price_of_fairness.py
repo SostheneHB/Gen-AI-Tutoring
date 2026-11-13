@@ -125,7 +125,10 @@ def main():
                   f"dk0 {agg['true_dk0']:+.3f}, dk1 {agg['true_dk1']:+.3f} (worst {agg['min_true_dk']:+.3f}), budget x{agg['true_budget_ratio']:.2f}", flush=True)
         cap = [r["capacity_share"] for r in runs if r["capacity_share"] is not None]
         print(f"  fairness capacity: {np.mean(cap):.3f} of the gap (range {min(cap):.3f}-{max(cap):.3f}); model gap {np.mean([abs(r['model_gap_eff']) for r in runs]):.3f}, true gap {np.mean([abs(r['eff']['gap']) for r in runs]):.3f}")
-        out[str(gamma)] = dict(eff_vs_ref=e, frontier=rows, capacity_share=[float(x) for x in cap],
+        per_model = [dict(model_gap=float(abs(r["model_gap_eff"])), true_gap=float(abs(r["eff"]["gap"])),
+                          rows=[{k: x.get(k) for k in ("fraction", "feasible", "extra_budget_model", "promised_reduction", "true_reduction")}
+                                for x in r["rows"]]) for r in runs]
+        out[str(gamma)] = dict(eff_vs_ref=e, frontier=rows, per_model=per_model, capacity_share=[float(x) for x in cap],
                                model_gap=float(np.mean([abs(r["model_gap_eff"]) for r in runs])),
                                true_gap=float(np.mean([abs(r["eff"]["gap"]) for r in runs])))
     d = ROOT / "outputs" / "02_price_of_fairness"

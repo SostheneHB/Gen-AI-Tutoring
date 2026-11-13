@@ -1,11 +1,12 @@
 # Narrowing a gap without levelling down: code of two companion papers
 
-This folder holds the code of two related papers, both under review:
+This folder holds the code of two related papers, not yet published:
 
 - **[C] Narrowing a Gap without Levelling Down: Price, Welfare and Certified Decisions with Learned Models** (decisions, certificates; simulators only);
 - **[B] What Learning Logs Can and Cannot Tell About Narrowing a Gap without Levelling Down** (educational data).
 
-`code/paper1_base/` is the frozen simulator and model code of the companion paper [A] (the rest of this repository).
+`code/paper1_base/` is the frozen simulator and model code of the companion paper [A] (the rest of this repository;
+Hounzinhin, Ratnani and El Akri, arXiv:2611.16100).
 Only code is published here: **no data, no derived data file, no per-student output**. Every script writes aggregate numbers only.
 
 Install: `pip install -r requirements.txt` (Python 3.11+). Run every script from this folder, for example
@@ -32,6 +33,13 @@ each script writes aggregate numbers to `outputs/<experiment>/`.
 | Planning figure (estimated effects) | `make_fig07_estimated_planning.py` |
 | Semi-synthetic test (Eedi-calibrated) | `run_semisynthetic.py --kappas 0.25 0.5 1.0` then `make_tab_semisynthetic.py` (parameters built in; to refit them from the Eedi files: `fit_bkt_eedi.py`) |
 | Appendix C audit | `audit_certificate_scores.py` |
+| Family with safe and harmful plans (per-plan certificate) | `run_mixed_family.py`, then `make_tab_mixed.py` |
+| Late-help rule at equal budget | `run_late_help_baseline.py` |
+| Validation of the Eedi-fitted knowledge tracing (needs the Eedi files) | `validate_bkt_eedi.py` |
+| Figure of the certificate risk per fitted model | `make_fig08_certificate_risk.py` (reads `outputs/12_certificate_v3`) |
+| Figure of the sensitivity to the learned model | `make_fig09_model_sensitivity.py` (reads `outputs/13_model_sensitivity`) |
+| Planning figure with the margin written zeta | `make_fig07_estimated_planning.py --zeta` |
+| Decomposition figures with named terms (simulator and OULAD) | `make_fig01_fig05_named_terms.py` (reads `outputs/01_decomposition_simulator` and `outputs/06_oulad_start`) |
 | Tests | `python -m pytest code/tests` |
 
 `code/paper1_base/` is the simulator and model code of the companion paper [A], unchanged.

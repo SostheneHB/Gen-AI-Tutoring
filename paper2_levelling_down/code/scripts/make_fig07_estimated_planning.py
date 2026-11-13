@@ -7,9 +7,11 @@ For a target narrowing rho and a margin delta, the conservative score allows the
 group and arm (sigma = standard deviation of the final outcome, rho_n = 0.8, beta' = beta / (20 (L + 1)),
 beta = 0.02, L = 4 plans; Bardenet and Maillard 2015, Thm 4.3).  The figure gives the smallest such n.
 Horizontal lines: the cohort sizes of experiment 17 (10,000, 50,000 and 250,000 students, two groups, five arms).
-Writes figures/fig07_estimated_planning.png.
+Writes figures/fig07_estimated_planning.png.  With --zeta, the margin is written zeta instead of delta (for a text where
+delta is the gap) and the figure goes to figures/named_terms/fig07_estimated_planning.png.
 """
 import math
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -36,6 +38,7 @@ def needed(rho, delta, sigma):
 
 
 def main():
+    sym = "zeta" if "--zeta" in sys.argv[1:] else "delta"
     rhos = np.logspace(math.log10(0.003), math.log10(0.3), 120)
     colors = {0.1: "#0072B2", 0.3: "#D55E00", 0.5: "#009E73"}       # Okabe-Ito, colour-blind safe
     fig, ax = plt.subplots(figsize=(6.4, 4.2))
@@ -43,7 +46,7 @@ def main():
     for d, c in colors.items():
         y = [needed(r, d, 0.25) for r in rhos]
         ax.plot(rhos, y, color=c, lw=2)
-        ax.text(rhos[-1] * 1.04, y[-1], f"$\\delta={d}$", color="#333333", fontsize=9, va="center")
+        ax.text(rhos[-1] * 1.04, y[-1], f"$\\{sym}={d}$", color="#333333", fontsize=9, va="center")
     for cohort, lab in ((10_000, "10,000"), (50_000, "50,000"), (250_000, "250,000")):
         ax.axhline(cohort / 10, color="#777777", lw=1, ls="--")
         ax.text(0.0033, cohort / 10 * 1.12, f"cohort of {lab}", color="#555555", fontsize=8)
@@ -59,7 +62,8 @@ def main():
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     fig.tight_layout()
-    out = ROOT / "figures" / "fig07_estimated_planning.png"
+    out = ROOT / "figures" / ("named_terms" if sym == "zeta" else "") / "fig07_estimated_planning.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=200)
     print("written", out, "| needed at rho=0.05, delta=0.3, sigma=0.25:", round(needed(0.05, 0.3, 0.25)),
           "| at rho=0.003:", round(needed(0.003, 0.3, 0.45)))
