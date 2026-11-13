@@ -2,6 +2,9 @@
 
 Code for the paper **"Hiding a Gap Does Not Close It: The Price of Removing the Mean Group Contrast from Learned Models of Learning Dynamics"**.
 
+Paper: Sosthène Bidojesussi Hounzinhin, Ahmed Ratnani and Abdeladim El Akri, arXiv:2611.16100 (2026),
+[https://arxiv.org/abs/2611.16100](https://arxiv.org/abs/2611.16100).
+
 ## Reproduction (release v1.6)
 
 Everything needed to recompute the numbers, tables and figures of the paper is in [`reproduction/`](reproduction/):
@@ -25,7 +28,7 @@ from their providers; outputs derived from them are not redistributed and are re
 
 ## Archive
 
-Release v1.6 adds the controlled study with 1,000 bootstrap draws and the next-item audit with four sets of units (see `reproduction/README.md`, "Release v1.6"); its Zenodo DOI will be added here. Release v1.5 is archived on Zenodo: [doi:10.5281/zenodo.23362913](https://doi.org/10.5281/zenodo.23362913); it adds the scripts of the audit with explicit targets (see `reproduction/README.md`, "Release v1.5"). Release v1.4: [doi:10.5281/zenodo.23359853](https://doi.org/10.5281/zenodo.23359853); it adds the scripts of the two last revisions (see `reproduction/README.md`, "Release v1.4"). Release v1.3: [doi:10.5281/zenodo.23342342](https://doi.org/10.5281/zenodo.23342342). Earlier release v1.1: [doi:10.5281/zenodo.23329603](https://doi.org/10.5281/zenodo.23329603).
+Release v1.6 is archived on Zenodo: [doi:10.5281/zenodo.24147314](https://doi.org/10.5281/zenodo.24147314); it adds the controlled study with 1,000 bootstrap draws and the next-item audit with four sets of units (see `reproduction/README.md`, "Release v1.6"). Release v1.5 is archived on Zenodo: [doi:10.5281/zenodo.23362913](https://doi.org/10.5281/zenodo.23362913); it adds the scripts of the audit with explicit targets (see `reproduction/README.md`, "Release v1.5"). Release v1.4: [doi:10.5281/zenodo.23359853](https://doi.org/10.5281/zenodo.23359853); it adds the scripts of the two last revisions (see `reproduction/README.md`, "Release v1.4"). Release v1.3: [doi:10.5281/zenodo.23342342](https://doi.org/10.5281/zenodo.23342342). Earlier release v1.1: [doi:10.5281/zenodo.23329603](https://doi.org/10.5281/zenodo.23329603).
 
 ## Other files
 
